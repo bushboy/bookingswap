@@ -13,14 +13,18 @@ import { selectActiveOperations } from '../../store/selectors/proposalAcceptance
 
 interface ReceivedProposalsSectionProps {
     proposals: SwapProposalCard[];
-    onAcceptProposal: (proposalId: string) => void;
-    onRejectProposal: (proposalId: string) => void;
+    onAcceptProposal: (proposalId: string) => Promise<void> | void;
+    onRejectProposal: (proposalId: string, reason?: string) => Promise<void> | void;
     showInCard?: boolean;
     maxVisibleInCard?: number;
     /** Function to get status data for a proposal */
     getProposalStatusData?: (proposalId: string) => ProposalStatusData | undefined;
     /** Callback when retry is requested */
     onRetryProposal?: (proposalId: string) => void;
+    /** Current user ID for permission diagnostics */
+    currentUserId?: string;
+    /** Parent swap ID for websocket/processing state */
+    swapId?: string;
 }
 
 export const ReceivedProposalsSection: React.FC<ReceivedProposalsSectionProps> = ({
@@ -31,6 +35,8 @@ export const ReceivedProposalsSection: React.FC<ReceivedProposalsSectionProps> =
     maxVisibleInCard = 2,
     getProposalStatusData,
     onRetryProposal,
+    currentUserId,
+    swapId,
 }) => {
     const { isMobile } = useResponsive();
     const { announce } = useAnnouncements();
@@ -381,6 +387,9 @@ export const ReceivedProposalsSection: React.FC<ReceivedProposalsSectionProps> =
                                             statusData={getProposalStatusData ? getProposalStatusData(proposal.id) : undefined}
                                             showStatus={false} // We show it separately above
                                             onRetry={onRetryProposal}
+                                            currentUserId={currentUserId}
+                                            proposalOwnerId={currentUserId}
+                                            swapId={swapId}
                                         />
                                     </div>
                                 )}
@@ -602,6 +611,7 @@ export const ReceivedProposalsSection: React.FC<ReceivedProposalsSectionProps> =
                                                 flex: isMobile ? 1 : undefined,
                                             }}
                                             aria-label="Reject this proposal"
+                                            data-testid="reject-proposal-button"
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: tokens.spacing[1] }}>
                                                 <span>❌</span>
@@ -620,6 +630,7 @@ export const ReceivedProposalsSection: React.FC<ReceivedProposalsSectionProps> =
                                                 flex: isMobile ? 1 : undefined,
                                             }}
                                             aria-label="Accept this proposal"
+                                            data-testid="accept-proposal-button"
                                         >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: tokens.spacing[1] }}>
                                                 <span>✅</span>

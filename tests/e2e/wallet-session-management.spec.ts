@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { WALLET_CONFIG } from '../fixtures/wallet-config';
 
 test.describe('Wallet Session Management E2E Tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -24,21 +25,21 @@ test.describe('Wallet Session Management E2E Tests', () => {
   test.describe('Session Persistence', () => {
     test('should persist wallet connection across browser sessions', async ({ page }) => {
       // Setup wallet with persistence
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         // @ts-ignore
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
           isConnected: () => true,
         };
-      });
+      }, WALLET_CONFIG);
 
       // Connect wallet
       await page.click('[data-testid="connect-wallet-button"]');
@@ -48,10 +49,10 @@ test.describe('Wallet Session Management E2E Tests', () => {
       // Verify session data is stored
       const sessionData = await page.evaluate(() => localStorage.getItem('wallet-session'));
       expect(sessionData).toBeTruthy();
-      
+
       const parsedSession = JSON.parse(sessionData);
       expect(parsedSession.provider).toBe('hashpack');
-      expect(parsedSession.accountId).toBe('0.0.123456');
+      expect(parsedSession.accountId).toBe('0.0.6199687');
       expect(parsedSession.connected).toBe(true);
 
       // Simulate browser restart by reloading page
@@ -59,16 +60,16 @@ test.describe('Wallet Session Management E2E Tests', () => {
 
       // Verify connection is restored
       await expect(page.locator('[data-testid="wallet-connected"]')).toBeVisible();
-      await expect(page.locator('[data-testid="wallet-address"]')).toContainText('0x1234...3456');
+      await expect(page.locator('[data-testid="wallet-address"]')).toContainText('0x6199...9687');
       await expect(page.locator('[data-testid="wallet-provider-name"]')).toContainText('HashPack');
     });
 
     test('should handle expired session gracefully', async ({ page }) => {
       // Set expired session data
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         const expiredSession = {
           provider: 'hashpack',
-          accountId: '0.0.123456',
+          accountId: config.PRIMARY_TESTNET_ACCOUNT,
           connected: true,
           timestamp: Date.now() - (24 * 60 * 60 * 1000), // 24 hours ago
           expiresAt: Date.now() - (1 * 60 * 60 * 1000), // Expired 1 hour ago
@@ -96,13 +97,13 @@ test.describe('Wallet Session Management E2E Tests', () => {
       expect(sessionData).toBeFalsy();
 
       // Verify user can connect fresh
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         // @ts-ignore
         window.hashpack.connect = async () => ({
-          accountIds: ['0.0.123456'],
-          network: 'testnet',
+          accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+          network: config.NETWORK,
         });
-      });
+      }, WALLET_CONFIG);
 
       await page.click('[data-testid="connect-wallet-button"]');
       await page.click('[data-testid="wallet-provider-hashpack"]');
@@ -111,20 +112,20 @@ test.describe('Wallet Session Management E2E Tests', () => {
 
     test('should maintain session across page navigation', async ({ page }) => {
       // Setup connected wallet
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         // @ts-ignore
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
         };
-      });
+      }, WALLET_CONFIG);
 
       // Connect wallet
       await page.click('[data-testid="connect-wallet-button"]');
@@ -133,13 +134,13 @@ test.describe('Wallet Session Management E2E Tests', () => {
 
       // Navigate to different pages
       const pages = ['/bookings', '/swaps', '/profile', '/settings'];
-      
+
       for (const pagePath of pages) {
         await page.goto(pagePath);
-        
+
         // Verify wallet remains connected
         await expect(page.locator('[data-testid="wallet-connected"]')).toBeVisible();
-        await expect(page.locator('[data-testid="wallet-address"]')).toContainText('0x1234...3456');
+        await expect(page.locator('[data-testid="wallet-address"]')).toContainText('0x6199...9687');
       }
 
       // Return to home and verify still connected
@@ -149,20 +150,20 @@ test.describe('Wallet Session Management E2E Tests', () => {
 
     test('should handle browser data clearing', async ({ page }) => {
       // Setup connected wallet
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         // @ts-ignore
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
         };
-      });
+      }, WALLET_CONFIG);
 
       // Connect wallet
       await page.click('[data-testid="connect-wallet-button"]');
@@ -192,20 +193,20 @@ test.describe('Wallet Session Management E2E Tests', () => {
   test.describe('Session Security', () => {
     test('should validate session integrity', async ({ page }) => {
       // Setup wallet
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         // @ts-ignore
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
         };
-      });
+      }, WALLET_CONFIG);
 
       // Connect wallet
       await page.click('[data-testid="connect-wallet-button"]');
@@ -237,20 +238,20 @@ test.describe('Wallet Session Management E2E Tests', () => {
 
     test('should handle concurrent session conflicts', async ({ page, context }) => {
       // Setup wallet
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         // @ts-ignore
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
         };
-      });
+      }, WALLET_CONFIG);
 
       // Connect wallet in first tab
       await page.click('[data-testid="connect-wallet-button"]');
@@ -262,20 +263,20 @@ test.describe('Wallet Session Management E2E Tests', () => {
       await secondPage.goto('/');
 
       // Setup different wallet in second tab
-      await secondPage.addInitScript(() => {
+      await secondPage.addInitScript((config) => {
         // @ts-ignore
         window.blade = {
           isAvailable: true,
           createAccount: async () => ({
-            accountId: '0.0.789012',
-            network: 'testnet',
+            accountId: config.SECONDARY_TESTNET_ACCOUNT,
+            network: config.NETWORK,
           }),
           getAccountInfo: async () => ({
-            accountId: '0.0.789012',
+            accountId: config.SECONDARY_TESTNET_ACCOUNT,
             balance: 75.25,
           }),
         };
-      });
+      }, WALLET_CONFIG);
 
       // Connect different wallet in second tab
       await secondPage.click('[data-testid="connect-wallet-button"]');
@@ -297,24 +298,24 @@ test.describe('Wallet Session Management E2E Tests', () => {
 
     test('should enforce session timeout', async ({ page }) => {
       // Setup wallet with short session timeout
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         // @ts-ignore
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
         };
 
         // Override session timeout to 5 seconds for testing
         // @ts-ignore
         window.WALLET_SESSION_TIMEOUT = 5000;
-      });
+      }, WALLET_CONFIG);
 
       // Connect wallet
       await page.click('[data-testid="connect-wallet-button"]');
@@ -342,10 +343,10 @@ test.describe('Wallet Session Management E2E Tests', () => {
   test.describe('Auto-Reconnection', () => {
     test('should attempt auto-reconnection on page load', async ({ page }) => {
       // Setup wallet with stored session
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         const validSession = {
           provider: 'hashpack',
-          accountId: '0.0.123456',
+          accountId: config.PRIMARY_TESTNET_ACCOUNT,
           connected: true,
           timestamp: Date.now(),
           autoReconnect: true,
@@ -356,16 +357,16 @@ test.describe('Wallet Session Management E2E Tests', () => {
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
           isConnected: () => true,
         };
-      });
+      }, WALLET_CONFIG);
 
       await page.goto('/');
 
@@ -380,10 +381,10 @@ test.describe('Wallet Session Management E2E Tests', () => {
 
     test('should handle failed auto-reconnection gracefully', async ({ page }) => {
       // Setup wallet with stored session but connection fails
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         const validSession = {
           provider: 'hashpack',
-          accountId: '0.0.123456',
+          accountId: config.PRIMARY_TESTNET_ACCOUNT,
           connected: true,
           timestamp: Date.now(),
           autoReconnect: true,
@@ -417,10 +418,10 @@ test.describe('Wallet Session Management E2E Tests', () => {
 
     test('should respect user preference for auto-reconnection', async ({ page }) => {
       // Setup wallet with auto-reconnect disabled
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         const sessionWithoutAutoReconnect = {
           provider: 'hashpack',
-          accountId: '0.0.123456',
+          accountId: config.PRIMARY_TESTNET_ACCOUNT,
           connected: true,
           timestamp: Date.now(),
           autoReconnect: false,
@@ -431,15 +432,15 @@ test.describe('Wallet Session Management E2E Tests', () => {
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
         };
-      });
+      }, WALLET_CONFIG);
 
       await page.goto('/');
 
@@ -457,21 +458,21 @@ test.describe('Wallet Session Management E2E Tests', () => {
   test.describe('Session Cleanup', () => {
     test('should clean up session on explicit disconnect', async ({ page }) => {
       // Setup connected wallet
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         // @ts-ignore
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
-          disconnect: async () => {},
+          disconnect: async () => { },
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
         };
-      });
+      }, WALLET_CONFIG);
 
       // Connect wallet
       await page.click('[data-testid="connect-wallet-button"]');
@@ -496,18 +497,18 @@ test.describe('Wallet Session Management E2E Tests', () => {
 
     test('should clean up session on window close', async ({ page, context }) => {
       // Setup connected wallet
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         // @ts-ignore
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
-          disconnect: async () => {},
+          disconnect: async () => { },
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
         };
 
@@ -516,7 +517,7 @@ test.describe('Wallet Session Management E2E Tests', () => {
           // Cleanup session on window close
           localStorage.removeItem('wallet-session');
         });
-      });
+      }, WALLET_CONFIG);
 
       // Connect wallet
       await page.click('[data-testid="connect-wallet-button"]');
@@ -538,24 +539,24 @@ test.describe('Wallet Session Management E2E Tests', () => {
 
     test('should handle partial session cleanup gracefully', async ({ page }) => {
       // Setup wallet
-      await page.addInitScript(() => {
+      await page.addInitScript((config) => {
         // @ts-ignore
         window.hashpack = {
           isAvailable: true,
           connect: async () => ({
-            accountIds: ['0.0.123456'],
-            network: 'testnet',
+            accountIds: [config.PRIMARY_TESTNET_ACCOUNT],
+            network: config.NETWORK,
           }),
           disconnect: async () => {
             // Simulate partial cleanup failure
             throw new Error('Disconnect failed');
           },
           getAccountInfo: async () => ({
-            accountId: '0.0.123456',
-            balance: { hbars: 100.5 },
+            accountId: config.PRIMARY_TESTNET_ACCOUNT,
+            balance: { hbars: config.DEFAULT_BALANCE },
           }),
         };
-      });
+      }, WALLET_CONFIG);
 
       // Connect wallet
       await page.click('[data-testid="connect-wallet-button"]');

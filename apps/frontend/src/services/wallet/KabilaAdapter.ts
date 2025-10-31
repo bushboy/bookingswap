@@ -75,126 +75,28 @@ export class KabilaAdapter extends BaseWalletAdapter {
   public readonly icon = '/icons/kabila.svg';
 
   private kabila: KabilaWallet | null = null;
-  private availabilityCache: { result: boolean; timestamp: number } | null = null;
-  private readonly AVAILABILITY_CACHE_DURATION = 5000; // 5 seconds
-  private connectionHealthCheckInterval: NodeJS.Timeout | null = null;
-  private connectionDiagnostics: KabilaDiagnostics | null = null;
+
 
   /**
-   * Check if Kabila wallet is available
+   * Check if Kabila wallet is available (simplified)
    */
   public async isAvailable(): Promise<boolean> {
-    // Check cache first to avoid repeated checks
-    if (this.availabilityCache) {
-      const now = Date.now();
-      if (now - this.availabilityCache.timestamp < this.AVAILABILITY_CACHE_DURATION) {
-        return this.availabilityCache.result;
-      }
-    }
-
-    const result = await this.checkAvailabilityWithRetry(3, 1000);
-
-    // Cache the result
-    this.availabilityCache = {
-      result,
-      timestamp: Date.now()
-    };
-
-    return result;
-  }
-
-  /**
-   * Check availability with retry logic and exponential backoff
-   */
-  private async checkAvailabilityWithRetry(
-    maxRetries: number = 3,
-    initialDelay: number = 1000
-  ): Promise<boolean> {
-    let attempt = 0;
-    let delay = initialDelay;
-
-    while (attempt < maxRetries) {
-      try {
-        const isAvailable = await this.checkKabilaAvailability();
-        if (isAvailable) {
-          return true;
-        }
-
-        // If not available on first attempt, it might be loading
-        if (attempt === 0) {
-          attempt++;
-          await this.sleep(delay);
-          delay *= 2; // Exponential backoff
-          continue;
-        }
-
+    try {
+      if (typeof window === 'undefined') {
         return false;
-      } catch (error) {
-        console.warn(`Kabila availability check attempt ${attempt + 1} failed:`, error);
-
-        if (attempt === maxRetries - 1) {
-          return false;
-        }
-
-        attempt++;
-        await this.sleep(delay);
-        delay *= 2; // Exponential backoff
       }
+
+      // Simple synchronous check
+      return window.kabila !== undefined &&
+        window.kabila !== null &&
+        window.kabila.isAvailable === true;
+    } catch (error) {
+      console.warn('Kabila availability check failed:', error);
+      return false;
     }
-
-    return false;
   }
 
-  /**
-   * Check Kabila availability with timeout handling
-   */
-  private async checkKabilaAvailability(): Promise<boolean> {
-    return new Promise((resolve) => {
-      // Set a timeout for the availability check
-      const timeout = setTimeout(() => {
-        resolve(false);
-      }, 3000); // 3 second timeout
 
-      try {
-        if (typeof window === 'undefined') {
-          clearTimeout(timeout);
-          resolve(false);
-          return;
-        }
-
-        // Check if window.kabila exists and is properly initialized
-        if (window.kabila === undefined) {
-          clearTimeout(timeout);
-          resolve(false);
-          return;
-        }
-
-        // Check if kabila has the required properties
-        if (typeof window.kabila !== 'object' || window.kabila === null) {
-          clearTimeout(timeout);
-          resolve(false);
-          return;
-        }
-
-        // Check if isAvailable property exists and is true
-        const isAvailable = window.kabila.isAvailable === true;
-
-        clearTimeout(timeout);
-        resolve(isAvailable);
-      } catch (error) {
-        clearTimeout(timeout);
-        console.warn('Error in checkKabilaAvailability:', error);
-        resolve(false);
-      }
-    });
-  }
-
-  /**
-   * Sleep utility for retry delays
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
 
   /**
    * Perform connection health check
@@ -489,15 +391,10 @@ export class KabilaAdapter extends BaseWalletAdapter {
         isConnected: true,
       };
 
-      // Start health monitoring after successful connection
-      this.startHealthMonitoring();
       this.setupNetworkChangeListener();
 
       // Save connection state for persistence
       this.saveConnectionState();
-
-      // Collect initial diagnostics
-      this.connectionDiagnostics = await this.collectDiagnostics();
 
       this.emit('connect', this.connection);
 
@@ -518,8 +415,7 @@ export class KabilaAdapter extends BaseWalletAdapter {
         await this.kabila.disconnect();
       }
 
-      // Stop health monitoring
-      this.stopHealthMonitoring();
+
 
       // Clear stored connection state
       this.clearStoredConnection();
@@ -1042,12 +938,7 @@ export class KabilaAdapter extends BaseWalletAdapter {
     }
   }
 
-  /**
-   * Clear availability cache
-   */
-  public clearAvailabilityCache(): void {
-    this.availabilityCache = null;
-  }
+
 
   /**
    * Clean up resources
@@ -1060,12 +951,7 @@ export class KabilaAdapter extends BaseWalletAdapter {
       (this as any).networkCheckInterval = null;
     }
 
-    // Stop health monitoring
-    this.stopHealthMonitoring();
 
-    // Clear caches and diagnostics
-    this.availabilityCache = null;
-    this.connectionDiagnostics = null;
 
     this.kabila = null;
   }

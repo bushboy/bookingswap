@@ -44,7 +44,7 @@ export class ErrorDebugger {
     private static instance: ErrorDebugger;
     private debugSessions: Map<string, DebugSession> = new Map();
     private currentSession: DebugSession | null = null;
-    private isEnabled: boolean = process.env.NODE_ENV === 'development';
+    private isEnabled: boolean = import.meta.env.DEV;
     private consoleMessages: any[] = [];
     private networkRequests: any[] = [];
 
@@ -261,7 +261,7 @@ export class ErrorDebugger {
      * Enable/disable debugging
      */
     setEnabled(enabled: boolean): void {
-        this.isEnabled = enabled && process.env.NODE_ENV === 'development';
+        this.isEnabled = enabled && import.meta.env.DEV;
 
         if (this.isEnabled) {
             this.setupDebugHooks();

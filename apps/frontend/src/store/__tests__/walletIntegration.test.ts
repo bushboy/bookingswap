@@ -86,7 +86,11 @@ describe('Wallet Redux Integration', () => {
     // Verify connected state
     expect(selectIsWalletConnected(store.getState())).toBe(true);
     expect(selectCurrentProvider(store.getState())).toBe('hashpack');
-    expect(selectAccountInfo(store.getState())).toEqual(mockAccountInfo);
+    // Check account info fields individually since lastUpdated is added automatically
+    const accountInfo = selectAccountInfo(store.getState());
+    expect(accountInfo?.accountId).toBe(mockAccountInfo.accountId);
+    expect(accountInfo?.balance).toBe(mockAccountInfo.balance);
+    expect(accountInfo?.network).toBe(mockAccountInfo.network);
     expect(selectConnectionStatus(store.getState())).toBe('connected');
 
     // Disconnect

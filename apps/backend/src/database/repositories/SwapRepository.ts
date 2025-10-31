@@ -334,11 +334,11 @@ export class SwapRepository extends BaseRepository<Swap> {
   }
 
 
-
   /**
    * Create enhanced swap with payment preferences and acceptance strategy
    */
-  async createEnhancedSwap(swapData: Omit<EnhancedSwap, 'id' | 'createdAt' | 'updatedAt'>): Promise<EnhancedSwap> {
+  /*async createEnhancedSwap(swapData: Omit<EnhancedSwap, 'id' | 'createdAt' | 'updatedAt'>): Promise<EnhancedSwap> {
+    // REMOVED: Duplicate createEnhancedSwap method - keeping the enhanced version at line ~3570
     try {
       const row = this.mapEnhancedEntityToRow(swapData);
       const columns = Object.keys(row).join(', ');
@@ -357,7 +357,7 @@ export class SwapRepository extends BaseRepository<Swap> {
       logger.error('Failed to create enhanced swap', { error, swapData });
       throw error;
     }
-  }
+  }*/
 
   /**
    * Find enhanced swap by ID

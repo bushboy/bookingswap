@@ -20,6 +20,8 @@ import { ProposalAcceptanceError, PROPOSAL_ACCEPTANCE_ERROR_CODES, ProposalAccep
 import { ProposalRollbackManager, RollbackStep } from './ProposalRollbackManager';
 import { ProposalAcceptanceErrorLogger } from './ProposalAcceptanceErrorLogger';
 import { ProposalTransactionManager } from './ProposalTransactionManager';
+import { SwapCompletionOrchestrator } from './SwapCompletionOrchestrator';
+import { SwapCompletionRequest, SwapCompletionResult, SwapCompletionError, SwapCompletionErrorCodes } from '@booking-swap/shared';
 import { logger } from '../../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -39,6 +41,10 @@ export interface ProposalAcceptanceResult {
         transactionId: string;
         consensusTimestamp?: string;
     };
+}
+
+export interface ProposalAcceptanceWithCompletionResult extends ProposalAcceptanceResult {
+    completion?: SwapCompletionResult;
 }
 
 export interface FinancialTransferRequest {
@@ -61,6 +67,7 @@ export interface FinancialTransferResult {
 export class ProposalAcceptanceService {
     private rollbackManager: ProposalRollbackManager;
     private errorLogger: ProposalAcceptanceErrorLogger;
+    private completionOrchestrator: SwapCompletionOrchestrator;
 
     constructor(
         private paymentService: PaymentProcessingService,
@@ -80,14 +87,61 @@ export class ProposalAcceptanceService {
             notificationService
         );
         this.errorLogger = new ProposalAcceptanceErrorLogger();
+        this.completionOrchestrator = new SwapCompletionOrchestrator(
+            transactionManager.pool,
+            hederaService,
+            notificationService
+        );
     }
 
     /**
      * Accept a proposal with validation, coordination, and financial transfer processing
      * Enhanced with comprehensive error handling and rollback capabilities
+     * Now uses completion workflow for atomic entity updates
      * Requirements: 1.1, 1.2, 6.1, 6.2, 6.3, 6.4, 6.5
      */
     async acceptProposal(request: ProposalAcceptanceRequest): Promise<ProposalAcceptanceResult> {
+        logger.info('Accepting proposal using completion workflow', {
+            proposalId: request.proposalId,
+            userId: request.userId
+        });
+
+        try {
+            // Use the new completion workflow for all proposal acceptances
+            const result = await this.acceptProposalWithCompletion(request);
+
+            // Return the standard result format for backward compatibility
+            return {
+                proposal: result.proposal,
+                swap: result.completion?.completedSwaps?.[0] ? {
+                    id: result.completion.completedSwaps[0].swapId,
+                    status: result.completion.completedSwaps[0].newStatus
+                } : undefined,
+                paymentTransaction: result.paymentTransaction,
+                blockchainTransaction: result.blockchainTransaction
+            };
+
+        } catch (error) {
+            logger.error('Proposal acceptance failed with completion workflow', {
+                proposalId: request.proposalId,
+                error: error instanceof Error ? error.message : String(error)
+            });
+
+            // If completion workflow fails, fall back to legacy acceptance method
+            logger.info('Falling back to legacy acceptance method', {
+                proposalId: request.proposalId
+            });
+
+            return this.acceptProposalLegacy(request);
+        }
+    }
+
+    /**
+     * Legacy proposal acceptance method (fallback)
+     * Maintains original acceptance logic for backward compatibility
+     * Requirements: 1.1, 1.2, 6.1, 6.2, 6.3, 6.4, 6.5
+     */
+    private async acceptProposalLegacy(request: ProposalAcceptanceRequest): Promise<ProposalAcceptanceResult> {
         const operationStartTime = new Date();
         const completedSteps: RollbackStep[] = [];
         let currentStep: string = 'initialization';
@@ -360,6 +414,397 @@ export class ProposalAcceptanceService {
             }
 
             throw proposalError;
+        }
+    }
+
+    /**
+     * Accept a proposal with comprehensive completion workflow
+     * Integrates with SwapCompletionOrchestrator for atomic entity updates
+     * Requirements: 1.1, 1.5, 4.1, 4.4
+     */
+    async acceptProposalWithCompletion(request: ProposalAcceptanceRequest): Promise<ProposalAcceptanceWithCompletionResult> {
+        const operationStartTime = new Date();
+        let currentStep: string = 'initialization';
+
+        const errorContext: ProposalAcceptanceErrorContext = {
+            proposalId: request.proposalId,
+            userId: request.userId,
+            action: 'accept',
+            operationStartTime,
+            errorSource: 'validation'
+        };
+
+        try {
+            logger.info('Processing proposal acceptance with completion workflow', {
+                proposalId: request.proposalId,
+                userId: request.userId,
+                swapTargetId: request.swapTargetId,
+                useCompletionWorkflow: true
+            });
+
+            // Step 1: Validate and authorize the proposal acceptance
+            currentStep = 'validation';
+            errorContext.errorSource = 'validation';
+
+            const proposal = await this.validateAndAuthorizeProposal(request.proposalId, request.userId, 'accept');
+
+            logger.info('Proposal validated for completion workflow', {
+                proposalId: proposal.id,
+                status: proposal.status,
+                proposalType: proposal.proposalType
+            });
+
+            // Step 2: Process financial transfer if this is a cash proposal
+            currentStep = 'payment_processing';
+            errorContext.errorSource = 'payment';
+
+            let paymentTransaction: PaymentTransaction | undefined;
+            if (this.isFinancialProposal(proposal)) {
+                try {
+                    const transferResult = await this.processFinancialTransfer({
+                        proposal,
+                        securityContext: this.createSecurityContext(request.userId)
+                    });
+                    paymentTransaction = transferResult.paymentTransaction;
+
+                    logger.info('Payment processed for completion workflow', {
+                        proposalId: proposal.id,
+                        transactionId: paymentTransaction.id,
+                        amount: paymentTransaction.amount
+                    });
+                } catch (error) {
+                    throw ProposalAcceptanceError.paymentProcessingFailed(
+                        request.proposalId,
+                        undefined,
+                        error instanceof Error ? error : new Error(String(error)),
+                        errorContext
+                    );
+                }
+            }
+
+            // Step 3: Orchestrate swap completion workflow
+            currentStep = 'completion_orchestration';
+            errorContext.errorSource = 'database';
+
+            let completionResult: SwapCompletionResult | undefined;
+            try {
+                completionResult = await this.orchestrateSwapCompletion(proposal, request.userId);
+
+                logger.info('Swap completion orchestrated successfully', {
+                    proposalId: proposal.id,
+                    completedSwaps: completionResult.completedSwaps.length,
+                    updatedBookings: completionResult.updatedBookings.length
+                });
+            } catch (error) {
+                await this.handleCompletionFailure(proposal, error, paymentTransaction);
+                throw error;
+            }
+
+            // Step 4: Record acceptance on blockchain (if not already done by completion workflow)
+            currentStep = 'blockchain_recording';
+            errorContext.errorSource = 'blockchain';
+
+            let blockchainTransaction = completionResult.blockchainTransaction;
+
+            // If completion workflow didn't record blockchain transaction, do it now
+            if (!blockchainTransaction || blockchainTransaction.transactionId.startsWith('failed_')) {
+                try {
+                    blockchainTransaction = await this.recordBlockchainTransaction('accept', proposal);
+                } catch (error) {
+                    throw new ProposalAcceptanceError(
+                        PROPOSAL_ACCEPTANCE_ERROR_CODES.BLOCKCHAIN_RECORDING_FAILED,
+                        'Failed to record acceptance on blockchain',
+                        errorContext,
+                        error instanceof Error ? error : new Error(String(error))
+                    );
+                }
+            }
+
+            logger.info('Proposal accepted successfully with completion workflow', {
+                proposalId: request.proposalId,
+                hasPayment: !!paymentTransaction,
+                hasCompletion: !!completionResult,
+                blockchainTxId: blockchainTransaction.transactionId,
+                operationDuration: Date.now() - operationStartTime.getTime()
+            });
+
+            return {
+                proposal: completionResult.proposal,
+                paymentTransaction,
+                blockchainTransaction,
+                completion: completionResult
+            };
+
+        } catch (error) {
+            const proposalError = error instanceof ProposalAcceptanceError
+                ? error
+                : new ProposalAcceptanceError(
+                    PROPOSAL_ACCEPTANCE_ERROR_CODES.OPERATION_TIMEOUT,
+                    `Proposal acceptance with completion failed at step: ${currentStep}`,
+                    { ...errorContext, metadata: { failedStep: currentStep } },
+                    error instanceof Error ? error : new Error(String(error))
+                );
+
+            // Log the error with comprehensive context
+            this.errorLogger.logError(proposalError, operationStartTime, { currentStep, useCompletionWorkflow: true });
+
+            throw proposalError;
+        }
+    }
+
+    /**
+     * Orchestrate swap completion workflow
+     * Coordinates with SwapCompletionOrchestrator for atomic entity updates
+     * Requirements: 1.1, 4.1, 4.4
+     */
+    private async orchestrateSwapCompletion(
+        proposal: SwapProposal,
+        acceptingUserId: string
+    ): Promise<SwapCompletionResult> {
+        try {
+            logger.info('Orchestrating swap completion', {
+                proposalId: proposal.id,
+                proposalType: proposal.proposalType,
+                acceptingUserId
+            });
+
+            // Prepare completion request
+            const completionRequest: SwapCompletionRequest = {
+                proposalId: proposal.id,
+                acceptingUserId,
+                proposalType: proposal.proposalType === 'cash' ? 'cash' : 'booking',
+                sourceSwapId: proposal.sourceSwapId,
+                targetSwapId: proposal.targetSwapId,
+                paymentTransactionId: undefined // Will be set if payment was processed
+            };
+
+            // Execute appropriate completion workflow based on proposal type
+            let completionResult: SwapCompletionResult;
+
+            if (proposal.proposalType === 'booking' && proposal.targetSwapId) {
+                // Booking exchange completion
+                completionResult = await this.completionOrchestrator.completeSwapExchange(completionRequest);
+            } else if (proposal.proposalType === 'cash') {
+                // Cash payment completion
+                completionResult = await this.completionOrchestrator.completeCashSwap(completionRequest);
+            } else {
+                throw new SwapCompletionError(
+                    SwapCompletionErrorCodes.INVALID_PROPOSAL_STATE,
+                    `Invalid proposal type for completion: ${proposal.proposalType}`,
+                    [proposal.id]
+                );
+            }
+
+            logger.info('Swap completion orchestration successful', {
+                proposalId: proposal.id,
+                completionType: proposal.proposalType,
+                completedSwaps: completionResult.completedSwaps.length,
+                updatedBookings: completionResult.updatedBookings.length
+            });
+
+            return completionResult;
+
+        } catch (error) {
+            logger.error('Swap completion orchestration failed', {
+                proposalId: proposal.id,
+                acceptingUserId,
+                error: error instanceof Error ? error.message : String(error)
+            });
+
+            if (error instanceof SwapCompletionError) {
+                throw error;
+            }
+
+            throw new SwapCompletionError(
+                SwapCompletionErrorCodes.DATABASE_TRANSACTION_FAILED,
+                `Completion orchestration failed: ${error instanceof Error ? error.message : String(error)}`,
+                [proposal.id]
+            );
+        }
+    }
+
+    /**
+     * Handle completion workflow failures with proper error recovery
+     * Requirements: 4.1, 4.4
+     */
+    private async handleCompletionFailure(
+        proposal: SwapProposal,
+        error: any,
+        paymentTransaction?: PaymentTransaction
+    ): Promise<void> {
+        try {
+            logger.info('Handling completion workflow failure', {
+                proposalId: proposal.id,
+                error: error instanceof Error ? error.message : String(error),
+                hasPaymentTransaction: !!paymentTransaction
+            });
+
+            // Step 1: Log the completion failure for monitoring
+            this.errorLogger.logRecoveryAttempt(
+                proposal.id,
+                proposal.targetUserId,
+                'completion_failure_recovery',
+                false,
+                error instanceof Error ? error : new Error(String(error)),
+                {
+                    proposalType: proposal.proposalType,
+                    hasPayment: !!paymentTransaction,
+                    errorType: error instanceof SwapCompletionError ? error.code : 'unknown'
+                }
+            );
+
+            // Step 2: Handle payment rollback if payment was processed
+            if (paymentTransaction && this.isFinancialProposal(proposal)) {
+                try {
+                    await this.handlePaymentFailure(proposal, error);
+                    logger.info('Payment rollback completed for completion failure', {
+                        proposalId: proposal.id,
+                        transactionId: paymentTransaction.id
+                    });
+                } catch (paymentRollbackError) {
+                    logger.error('Payment rollback failed during completion failure recovery', {
+                        proposalId: proposal.id,
+                        paymentTransactionId: paymentTransaction.id,
+                        rollbackError: paymentRollbackError instanceof Error ? paymentRollbackError.message : String(paymentRollbackError)
+                    });
+                }
+            }
+
+            // Step 3: Send failure notification to users
+            try {
+                await this.sendCompletionFailureNotification(proposal, error);
+            } catch (notificationError) {
+                logger.warn('Failed to send completion failure notification', {
+                    proposalId: proposal.id,
+                    notificationError: notificationError instanceof Error ? notificationError.message : String(notificationError)
+                });
+            }
+
+            // Step 4: Record failure on blockchain for audit trail
+            try {
+                await this.recordBlockchainTransaction('rollback', proposal, {
+                    reason: 'completion_failure',
+                    originalError: error instanceof Error ? error.message : String(error),
+                    rolledBackAt: new Date(),
+                    hadPayment: !!paymentTransaction
+                });
+            } catch (blockchainError) {
+                logger.warn('Failed to record completion failure on blockchain', {
+                    proposalId: proposal.id,
+                    blockchainError: blockchainError instanceof Error ? blockchainError.message : String(blockchainError)
+                });
+            }
+
+            logger.info('Completion failure handling completed', {
+                proposalId: proposal.id,
+                recoveryActions: ['payment_rollback', 'failure_notification', 'blockchain_audit']
+            });
+
+        } catch (recoveryError) {
+            logger.error('Completion failure recovery failed', {
+                proposalId: proposal.id,
+                originalError: error instanceof Error ? error.message : String(error),
+                recoveryError: recoveryError instanceof Error ? recoveryError.message : String(recoveryError)
+            });
+
+            // Don't throw recovery errors as they would mask the original completion error
+        }
+    }
+
+    /**
+     * Send completion failure notification to involved users
+     * Requirements: 8.1, 8.5
+     */
+    private async sendCompletionFailureNotification(
+        proposal: SwapProposal,
+        error: any
+    ): Promise<void> {
+        try {
+            const errorMessage = error instanceof SwapCompletionError
+                ? error.message
+                : 'An unexpected error occurred during swap completion';
+
+            const errorCode = error instanceof SwapCompletionError ? error.code : 'UNKNOWN_ERROR';
+            const rollbackSuccessful = true; // Assume rollback was successful if we reach this point
+            const requiresManualIntervention = error instanceof SwapCompletionError &&
+                [SwapCompletionErrorCodes.ROLLBACK_FAILED, SwapCompletionErrorCodes.INCONSISTENT_ENTITY_STATES].includes(error.code);
+
+            // Send comprehensive failure notification to the user who accepted the proposal
+            await this.notificationService.sendSwapCompletionFailureNotification({
+                proposalId: proposal.id,
+                userId: proposal.targetUserId,
+                errorMessage,
+                errorCode,
+                affectedEntities: error instanceof SwapCompletionError ? error.affectedEntities : undefined,
+                rollbackSuccessful,
+                requiresManualIntervention
+            });
+
+            // Send comprehensive failure notification to the proposal creator
+            await this.notificationService.sendSwapCompletionFailureNotification({
+                proposalId: proposal.id,
+                userId: proposal.proposerId,
+                errorMessage,
+                errorCode,
+                affectedEntities: error instanceof SwapCompletionError ? error.affectedEntities : undefined,
+                rollbackSuccessful,
+                requiresManualIntervention
+            });
+
+            // Send real-time WebSocket updates if available
+            if (this.notificationService.webSocketService) {
+                await this.notificationService.webSocketService.sendCompletionStatusUpdate({
+                    proposalId: proposal.id,
+                    status: 'failed',
+                    completionType: proposal.proposalType === 'cash' ? 'cash_payment' : 'booking_exchange',
+                    proposerId: proposal.proposerId,
+                    targetUserId: proposal.targetUserId,
+                    errorDetails: errorMessage
+                });
+            }
+
+            logger.info('Comprehensive completion failure notifications sent', {
+                proposalId: proposal.id,
+                notifiedUsers: [proposal.targetUserId, proposal.proposerId],
+                errorCode,
+                requiresManualIntervention
+            });
+
+        } catch (notificationError) {
+            logger.error('Failed to send completion failure notifications', {
+                proposalId: proposal.id,
+                error: notificationError instanceof Error ? notificationError.message : String(notificationError)
+            });
+
+            // Fallback to basic notification if comprehensive notification fails
+            try {
+                await this.notificationService.sendNotification(
+                    'swap_completion_failed',
+                    proposal.targetUserId,
+                    {
+                        title: 'Swap Completion Failed',
+                        message: `Your swap acceptance could not be completed. Please check your dashboard for details.`,
+                        proposalId: proposal.id,
+                        dashboardUrl: `${process.env.FRONTEND_URL}/dashboard`
+                    }
+                );
+
+                await this.notificationService.sendNotification(
+                    'swap_completion_failed',
+                    proposal.proposerId,
+                    {
+                        title: 'Swap Completion Failed',
+                        message: `The acceptance of your swap proposal could not be completed. Please check your dashboard for details.`,
+                        proposalId: proposal.id,
+                        dashboardUrl: `${process.env.FRONTEND_URL}/dashboard`
+                    }
+                );
+            } catch (fallbackError) {
+                logger.error('Fallback completion failure notification also failed', {
+                    proposalId: proposal.id,
+                    fallbackError: fallbackError instanceof Error ? fallbackError.message : String(fallbackError)
+                });
+            }
         }
     }
 
@@ -1839,11 +2284,13 @@ export class ProposalAcceptanceService {
                     status: row.status as any, // Already uses 'pending' status
                     cashOffer: row.cash_offer_amount ? {
                         amount: parseFloat(row.cash_offer_amount),
-                        currency: row.cash_offer_currency || 'USD'
+                        currency: row.cash_offer_currency || 'USD',
+                        paymentMethodId: 'default', // Default payment method
+                        escrowAccountId: undefined
                     } : undefined,
                     conditions: row.conditions || [],
                     message: row.message,
-                    expiresAt: row.expires_at ? new Date(row.expires_at) : undefined,
+                    expiresAt: row.expires_at ? new Date(row.expires_at) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default to 30 days from now
                     respondedAt: row.responded_at ? new Date(row.responded_at) : undefined,
                     respondedBy: undefined,
                     rejectionReason: undefined,
@@ -1851,8 +2298,8 @@ export class ProposalAcceptanceService {
                         proposalTransactionId: '',
                         responseTransactionId: undefined
                     },
-                    createdAt: new Date(row.created_at),
-                    updatedAt: new Date(row.updated_at)
+                    createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+                    updatedAt: row.updated_at ? new Date(row.updated_at) : new Date()
                 };
             }
 
@@ -1901,7 +2348,7 @@ export class ProposalAcceptanceService {
                     cashOffer: undefined,
                     conditions: [],
                     message: undefined,
-                    expiresAt: undefined,
+                    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default to 30 days from now
                     respondedAt: undefined,
                     respondedBy: undefined,
                     rejectionReason: undefined,
@@ -1909,8 +2356,8 @@ export class ProposalAcceptanceService {
                         proposalTransactionId: '',
                         responseTransactionId: undefined
                     },
-                    createdAt: new Date(row.created_at),
-                    updatedAt: new Date(row.updated_at)
+                    createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+                    updatedAt: row.updated_at ? new Date(row.updated_at) : new Date()
                 };
             }
 

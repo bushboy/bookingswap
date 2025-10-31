@@ -144,10 +144,10 @@ export type BackgroundIndividual = {
 export type BackgroundStyles = BackgroundShorthand | BackgroundIndividual;
 
 // Combined safe styles type
-export type SafeStyles = BorderStyles & 
-  MarginStyles & 
-  PaddingStyles & 
-  FontStyles & 
+export type SafeStyles = BorderStyles &
+  MarginStyles &
+  PaddingStyles &
+  FontStyles &
   BackgroundStyles & {
     // Other safe CSS properties that don't have shorthand conflicts
     color?: string;
@@ -244,7 +244,7 @@ export type ReactStyleProps = {
 
 // Helper function to validate styles at runtime (development only)
 export const validateStyles = (styles: Record<string, any>, componentName?: string): SafeStyles => {
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     const conflicts = detectConflicts(styles);
     if (conflicts.length > 0) {
       const component = componentName ? ` in ${componentName}` : '';
@@ -259,57 +259,57 @@ export const validateStyles = (styles: Record<string, any>, componentName?: stri
 function detectConflicts(styles: Record<string, any>): string[] {
   const conflicts: string[] = [];
   const keys = Object.keys(styles);
-  
+
   // Check border conflicts
   if (keys.includes('border')) {
-    const borderConflicts = keys.filter(k => 
+    const borderConflicts = keys.filter(k =>
       k.startsWith('border') && k !== 'border' && k !== 'borderRadius'
     );
     if (borderConflicts.length > 0) {
       conflicts.push(`border shorthand conflicts with: ${borderConflicts.join(', ')}`);
     }
   }
-  
+
   // Check margin conflicts
   if (keys.includes('margin')) {
-    const marginConflicts = keys.filter(k => 
+    const marginConflicts = keys.filter(k =>
       k.startsWith('margin') && k !== 'margin'
     );
     if (marginConflicts.length > 0) {
       conflicts.push(`margin shorthand conflicts with: ${marginConflicts.join(', ')}`);
     }
   }
-  
+
   // Check padding conflicts
   if (keys.includes('padding')) {
-    const paddingConflicts = keys.filter(k => 
+    const paddingConflicts = keys.filter(k =>
       k.startsWith('padding') && k !== 'padding'
     );
     if (paddingConflicts.length > 0) {
       conflicts.push(`padding shorthand conflicts with: ${paddingConflicts.join(', ')}`);
     }
   }
-  
+
   // Check font conflicts
   if (keys.includes('font')) {
-    const fontConflicts = keys.filter(k => 
+    const fontConflicts = keys.filter(k =>
       k.startsWith('font') && k !== 'font'
     );
     if (fontConflicts.length > 0) {
       conflicts.push(`font shorthand conflicts with: ${fontConflicts.join(', ')}`);
     }
   }
-  
+
   // Check background conflicts
   if (keys.includes('background')) {
-    const backgroundConflicts = keys.filter(k => 
+    const backgroundConflicts = keys.filter(k =>
       k.startsWith('background') && k !== 'background'
     );
     if (backgroundConflicts.length > 0) {
       conflicts.push(`background shorthand conflicts with: ${backgroundConflicts.join(', ')}`);
     }
   }
-  
+
   return conflicts;
 }
 
@@ -349,7 +349,7 @@ export const commonStyles = {
     boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
     padding: '16px',
   } as SafeStyles,
-  
+
   // Button base styles
   buttonBase: {
     border: '1px solid transparent',
@@ -360,7 +360,7 @@ export const commonStyles = {
     cursor: 'pointer',
     transition: 'all 0.2s ease-in-out',
   } as SafeStyles,
-  
+
   // Input base styles
   inputBase: {
     border: '1px solid #d1d5db',

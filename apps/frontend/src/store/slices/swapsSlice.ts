@@ -1,12 +1,9 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import {
-  Swap,
   SwapStatus,
-  EnhancedSwap,
   PaymentTypePreference,
   AcceptanceStrategy,
   AcceptanceStrategyType,
-  CashSwapConfiguration,
   EnhancedCreateSwapRequest,
   CreateEnhancedProposalRequest,
 } from '@booking-swap/shared';
@@ -14,15 +11,28 @@ import {
   SwapWithBookings,
   SwapProposal,
   SwapEvent,
-  SwapFilters,
+  CashSwapDetails,
 } from '../../services/swapService';
+import { SwapFilters } from '../../services/SwapFilterService';
+
+// Completion-related interfaces for swaps
+export interface SwapCompletionInfo {
+  completedAt?: Date;
+  completedBy?: string;
+  completionTransactionId?: string;
+  relatedSwapCompletions?: string[]; // IDs of other swaps completed in same transaction
+  blockchainCompletionId?: string;
+  completionType?: 'booking_exchange' | 'cash_payment';
+  proposalId?: string; // The proposal that triggered this completion
+}
 
 // Enhanced swap interface that extends SwapWithBookings
 interface EnhancedSwapWithBookings extends SwapWithBookings {
   paymentTypes?: PaymentTypePreference;
   acceptanceStrategy?: AcceptanceStrategy;
   auctionId?: string;
-  cashDetails?: CashSwapConfiguration;
+  cashDetails?: CashSwapDetails; // Use the correct type
+  completion?: SwapCompletionInfo; // Add completion tracking
 }
 
 interface SwapsState {
@@ -54,7 +64,7 @@ interface SwapsState {
   error: string | null;
 
   // Filters and search
-  filters: SwapFilters & {
+  filters: Partial<SwapFilters> & {
     paymentTypes?: ('booking' | 'cash')[];
     acceptanceStrategy?: AcceptanceStrategyType[];
     priceRange?: { min?: number; max?: number };
@@ -198,7 +208,7 @@ export const swapsSlice = createSlice({
       state.bookingOnlySwaps = action.payload.filter(
         s =>
           s.paymentTypes?.bookingExchange === true &&
-          s.paymentTypes?.cashPayment !== true
+          !s.paymentTypes?.cashPayment
       );
     },
     setCurrentSwap: (
@@ -232,7 +242,7 @@ export const swapsSlice = createSlice({
         state.cashEnabledSwaps.unshift(action.payload);
       } else if (
         action.payload.paymentTypes?.bookingExchange === true &&
-        action.payload.paymentTypes?.cashPayment !== true
+        !action.payload.paymentTypes?.cashPayment
       ) {
         state.bookingOnlySwaps.unshift(action.payload);
       }
@@ -677,8 +687,158 @@ export const swapsSlice = createSlice({
       state.bookingOnlySwaps = state.swaps.filter(
         s =>
           s.paymentTypes?.bookingExchange === true &&
-          s.paymentTypes?.cashPayment !== true
+          !s.paymentTypes?.cashPayment
       );
+    },
+
+    // Completion tracking actions
+    updateSwapCompletion: (
+      state,
+      action: PayloadAction<{
+        swapId: string;
+        completion: SwapCompletionInfo;
+      }>
+    ) => {
+      const { swapId, completion } = action.payload;
+      const swap = state.swaps.find(s => s.id === swapId);
+
+      if (swap) {
+        swap.completion = completion;
+
+        // Update status if completion indicates completed
+        if (completion.completedAt && swap.status !== 'completed') {
+          swap.status = 'completed';
+          swap.timeline.completedAt = completion.completedAt;
+        }
+
+        // Update current swap if it matches
+        if (state.currentSwap?.id === swapId) {
+          state.currentSwap = swap;
+        }
+
+        // Recategorize if status changed
+        state.pendingSwaps = state.swaps.filter(s => s.status === 'pending');
+        state.activeSwaps = state.swaps.filter(s => s.status === 'accepted');
+        state.completedSwaps = state.swaps.filter(s => s.status === 'completed');
+      }
+
+      state.lastUpdateTime = Date.now();
+    },
+
+    updateMultipleSwapCompletions: (
+      state,
+      action: PayloadAction<Array<{
+        swapId: string;
+        completion: SwapCompletionInfo;
+      }>>
+    ) => {
+      action.payload.forEach(({ swapId, completion }) => {
+        const swap = state.swaps.find(s => s.id === swapId);
+
+        if (swap) {
+          swap.completion = completion;
+
+          // Update status if completion indicates completed
+          if (completion.completedAt && swap.status !== 'completed') {
+            swap.status = 'completed';
+            swap.timeline.completedAt = completion.completedAt;
+          }
+        }
+      });
+
+      // Recategorize all swaps
+      state.pendingSwaps = state.swaps.filter(s => s.status === 'pending');
+      state.activeSwaps = state.swaps.filter(s => s.status === 'accepted');
+      state.completedSwaps = state.swaps.filter(s => s.status === 'completed');
+
+      state.lastUpdateTime = Date.now();
+    },
+
+    removeSwapCompletion: (state, action: PayloadAction<string>) => {
+      const swapId = action.payload;
+      const swap = state.swaps.find(s => s.id === swapId);
+
+      if (swap) {
+        swap.completion = undefined;
+
+        // Update current swap if it matches
+        if (state.currentSwap?.id === swapId) {
+          state.currentSwap = swap;
+        }
+      }
+    },
+
+    // Optimistic completion updates
+    optimisticSwapCompletion: (
+      state,
+      action: PayloadAction<{
+        swapId: string;
+        proposalId: string;
+        completionType: 'booking_exchange' | 'cash_payment';
+      }>
+    ) => {
+      const { swapId, proposalId, completionType } = action.payload;
+      const swap = state.swaps.find(s => s.id === swapId);
+
+      if (swap) {
+        // Add optimistic completion info
+        swap.completion = {
+          completedAt: new Date(),
+          completionType,
+          proposalId,
+          completionTransactionId: `optimistic-${Date.now()}`,
+        };
+
+        // Optimistically update status
+        swap.status = 'completed';
+        swap.timeline.completedAt = new Date();
+
+        // Update current swap if it matches
+        if (state.currentSwap?.id === swapId) {
+          state.currentSwap = swap;
+        }
+      }
+
+      // Recategorize swaps
+      state.pendingSwaps = state.swaps.filter(s => s.status === 'pending');
+      state.activeSwaps = state.swaps.filter(s => s.status === 'accepted');
+      state.completedSwaps = state.swaps.filter(s => s.status === 'completed');
+
+      state.lastUpdateTime = Date.now();
+    },
+
+    rollbackOptimisticSwapCompletion: (
+      state,
+      action: PayloadAction<{
+        swapId: string;
+        originalStatus: SwapStatus;
+      }>
+    ) => {
+      const { swapId, originalStatus } = action.payload;
+      const swap = state.swaps.find(s => s.id === swapId);
+
+      if (swap) {
+        // Remove optimistic completion info
+        swap.completion = undefined;
+
+        // Restore original status
+        swap.status = originalStatus;
+        if (originalStatus !== 'completed') {
+          swap.timeline.completedAt = undefined;
+        }
+
+        // Update current swap if it matches
+        if (state.currentSwap?.id === swapId) {
+          state.currentSwap = swap;
+        }
+      }
+
+      // Recategorize swaps
+      state.pendingSwaps = state.swaps.filter(s => s.status === 'pending');
+      state.activeSwaps = state.swaps.filter(s => s.status === 'accepted');
+      state.completedSwaps = state.swaps.filter(s => s.status === 'completed');
+
+      state.lastUpdateTime = Date.now();
     },
   },
 });
@@ -751,6 +911,13 @@ export const {
 
   // Real-time updates
   updateSwapStatus,
+
+  // Completion tracking actions
+  updateSwapCompletion,
+  updateMultipleSwapCompletions,
+  removeSwapCompletion,
+  optimisticSwapCompletion,
+  rollbackOptimisticSwapCompletion,
 } = swapsSlice.actions;
 
 // Basic selectors
@@ -805,7 +972,7 @@ export const selectSwapsByStatus = (
 
 export const selectUserSwaps = (state: { swaps: SwapsState }, userId: string) =>
   state.swaps.swaps.filter(
-    swap => swap.proposerId === userId || swap.ownerId === userId
+    swap => swap.proposer?.id === userId || swap.owner?.id === userId
   );
 
 export const selectProposalsForSwap = (
@@ -825,8 +992,8 @@ export const selectSwapsRequiringAction = (
   state.swaps.swaps.filter(
     swap =>
       swap.status === 'pending' &&
-      swap.ownerId === userId &&
-      swap.proposerId !== userId
+      swap.owner?.id === userId &&
+      swap.proposer?.id !== userId
   );
 
 export const selectExpiredSwaps = (state: { swaps: SwapsState }) =>
@@ -850,7 +1017,7 @@ export const selectSwapsByPaymentType = (
       return state.swaps.swaps.filter(
         swap =>
           swap.paymentTypes?.bookingExchange === true &&
-          swap.paymentTypes?.cashPayment !== true
+          !swap.paymentTypes?.cashPayment
       );
     case 'cash':
       return state.swaps.swaps.filter(
@@ -897,7 +1064,7 @@ export const selectEndingSoonAuctionSwaps = (state: { swaps: SwapsState }) => {
 export const selectSwapsWithCashOffers = (state: { swaps: SwapsState }) =>
   state.swaps.swaps.filter(
     swap =>
-      swap.paymentTypes?.cashPayment === true && swap.cashDetails?.minimumAmount
+      swap.paymentTypes?.cashPayment === true && swap.cashDetails?.minAmount
   );
 
 export const selectPaymentTransactionForSwap = (
@@ -936,7 +1103,7 @@ export const selectSwapStatistics = (state: { swaps: SwapsState }) => {
   const completedCashSwaps = cashSwaps.filter(s => s.status === 'completed');
 
   const cashOffers = cashSwaps
-    .map(s => s.cashDetails?.minimumAmount || 0)
+    .map(s => s.cashDetails?.minAmount || 0)
     .filter(amount => amount > 0);
 
   const averageCashOffer =
@@ -960,6 +1127,56 @@ export const selectSwapStatistics = (state: { swaps: SwapsState }) => {
   };
 };
 
+// Completion-related selectors
+export const selectSwapCompletion = (
+  state: { swaps: SwapsState },
+  swapId: string
+) => {
+  const swap = state.swaps.swaps.find(s => s.id === swapId);
+  return swap?.completion;
+};
+
+export const selectSwapsWithCompletion = (state: { swaps: SwapsState }) =>
+  state.swaps.swaps.filter(swap => swap.completion);
+
+export const selectSwapsByCompletionType = (
+  state: { swaps: SwapsState },
+  completionType: 'booking_exchange' | 'cash_payment'
+) => state.swaps.swaps.filter(
+  swap => swap.completion?.completionType === completionType
+);
+
+export const selectSwapsByProposal = (
+  state: { swaps: SwapsState },
+  proposalId: string
+) => state.swaps.swaps.filter(
+  swap => swap.completion?.proposalId === proposalId
+);
+
+export const selectRelatedCompletedSwaps = (
+  state: { swaps: SwapsState },
+  swapId: string
+) => {
+  const swap = state.swaps.swaps.find(s => s.id === swapId);
+  if (!swap?.completion?.relatedSwapCompletions) return [];
+
+  return state.swaps.swaps.filter(s =>
+    swap.completion!.relatedSwapCompletions!.includes(s.id)
+  );
+};
+
+export const selectRecentlyCompletedSwaps = (state: { swaps: SwapsState }) => {
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  return state.swaps.swaps.filter(swap => {
+    if (!swap.completion?.completedAt) return false;
+    return new Date(swap.completion.completedAt) > twentyFourHoursAgo;
+  });
+};
+
+export const selectSwapsWithBlockchainCompletion = (state: { swaps: SwapsState }) =>
+  state.swaps.swaps.filter(swap => swap.completion?.blockchainCompletionId);
+
 export const selectFilteredEnhancedSwaps = (state: { swaps: SwapsState }) => {
   const { swaps, filters } = state.swaps;
   let filtered = swaps;
@@ -967,7 +1184,7 @@ export const selectFilteredEnhancedSwaps = (state: { swaps: SwapsState }) => {
   // Apply payment type filters
   if (filters.paymentTypes && filters.paymentTypes.length > 0) {
     filtered = filtered.filter(swap => {
-      return filters.paymentTypes!.some(type => {
+      return filters.paymentTypes!.some((type: 'booking' | 'cash') => {
         if (type === 'booking') {
           return swap.paymentTypes?.bookingExchange === true;
         } else if (type === 'cash') {
@@ -991,9 +1208,9 @@ export const selectFilteredEnhancedSwaps = (state: { swaps: SwapsState }) => {
   if (filters.priceRange) {
     const { min, max } = filters.priceRange;
     filtered = filtered.filter(swap => {
-      if (!swap.cashDetails?.minimumAmount) return true;
+      if (!swap.cashDetails?.minAmount) return true;
 
-      const amount = swap.cashDetails.minimumAmount;
+      const amount = swap.cashDetails.minAmount;
       if (min !== undefined && amount < min) return false;
       if (max !== undefined && amount > max) return false;
 
@@ -1006,7 +1223,7 @@ export const selectFilteredEnhancedSwaps = (state: { swaps: SwapsState }) => {
     filtered = filtered.filter(swap => {
       if (swap.acceptanceStrategy?.type !== 'auction') return false;
 
-      return filters.auctionStatus!.some(status => {
+      return filters.auctionStatus!.some((status: 'active' | 'ending_soon' | 'ended') => {
         switch (status) {
           case 'active':
             return swap.status === 'pending' && swap.auctionId;

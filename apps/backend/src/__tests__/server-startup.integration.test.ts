@@ -3,6 +3,7 @@ import request from 'supertest';
 import { Express } from 'express';
 import { Server } from 'http';
 import { createApp } from '../index';
+import { WALLET_CONFIG } from '../../../tests/fixtures/wallet-config';
 
 // Mock all external dependencies for integration tests
 vi.mock('../database/config', () => ({
@@ -42,8 +43,8 @@ vi.mock('../services/hedera/WalletService', () => ({
   WalletService: vi.fn().mockImplementation(() => ({
     verifySignature: vi.fn().mockResolvedValue(true),
     generateWallet: vi.fn().mockResolvedValue({
-      accountId: '0.0.123456',
-      privateKey: 'test-private-key',
+      accountId: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT,
+      privateKey: WALLET_CONFIG.PRIMARY_TESTNET_PRIVATE_KEY,
       publicKey: 'test-public-key',
     }),
   })),
@@ -112,7 +113,7 @@ vi.mock('../database/repositories/NotificationRepository', () => ({
 vi.mock('../services/booking/factory', () => ({
   BookingServiceFactory: {
     getInstance: vi.fn().mockReturnValue({
-      createBookingListing: vi.fn().mockResolvedValue({ 
+      createBookingListing: vi.fn().mockResolvedValue({
         booking: { id: 'test-booking-id' },
         blockchainTransaction: { transactionId: 'test-tx-id' }
       }),
@@ -205,37 +206,37 @@ vi.mock('../controllers/SwapController', () => ({
     // Browse and info methods
     browseAvailableSwaps: vi.fn((req: any, res: any) => res.json({ swaps: [] })),
     getSwapInfoByBooking: vi.fn((req: any, res: any) => res.json({ swapInfo: {} })),
-    
+
     // Enhanced swap methods
     createEnhancedSwap: vi.fn((req: any, res: any) => res.json({ success: true })),
     createEnhancedProposal: vi.fn((req: any, res: any) => res.json({ success: true })),
-    
+
     // Inline proposal methods
     createInlineProposal: vi.fn((req: any, res: any) => res.json({ success: true })),
     updateInlineProposal: vi.fn((req: any, res: any) => res.json({ success: true })),
     withdrawInlineProposal: vi.fn((req: any, res: any) => res.json({ success: true })),
     getProposalStatus: vi.fn((req: any, res: any) => res.json({ status: 'pending' })),
-    
+
     // Swap listing management
     createSwapListing: vi.fn((req: any, res: any) => res.json({ success: true })),
-    
+
     // Swap proposal management
     createSwapProposal: vi.fn((req: any, res: any) => res.json({ success: true })),
     getUserSwaps: vi.fn((req: any, res: any) => res.json({ swaps: [] })),
     getSwapById: vi.fn((req: any, res: any) => res.json({ swap: {} })),
     cancelSwap: vi.fn((req: any, res: any) => res.json({ success: true })),
-    
+
     // Swap response operations
     acceptSwap: vi.fn((req: any, res: any) => res.json({ success: true })),
     rejectSwap: vi.fn((req: any, res: any) => res.json({ success: true })),
-    
+
     // Swap status and history
     getSwapStatus: vi.fn((req: any, res: any) => res.json({ status: 'pending' })),
-    
+
     // Booking-specific proposals
     getBookingProposals: vi.fn((req: any, res: any) => res.json({ proposals: [] })),
     getSwapByBookingId: vi.fn((req: any, res: any) => res.json({ swap: {} })),
-    
+
     // Auction methods
     createAuction: vi.fn((req: any, res: any) => res.json({ success: true })),
     getAuctions: vi.fn((req: any, res: any) => res.json({ auctions: [] })),
@@ -245,7 +246,7 @@ vi.mock('../controllers/SwapController', () => ({
     selectAuctionWinner: vi.fn((req: any, res: any) => res.json({ success: true })),
     getUserAuctions: vi.fn((req: any, res: any) => res.json({ auctions: [] })),
     placeBid: vi.fn((req: any, res: any) => res.json({ success: true })),
-    
+
     // Payment methods
     processPayment: vi.fn((req: any, res: any) => res.json({ success: true })),
     getPayments: vi.fn((req: any, res: any) => res.json({ payments: [] })),
@@ -279,7 +280,7 @@ describe('Server Startup Integration Tests', () => {
     process.env.JWT_SECRET = 'test-secret-key';
     process.env.JWT_EXPIRES_IN = '24h';
     process.env.FRONTEND_URL = 'http://localhost:3000';
-    
+
     // Create the app instance
     const appResult = await createApp();
     app = appResult.app;
@@ -292,7 +293,7 @@ describe('Server Startup Integration Tests', () => {
     delete process.env.JWT_SECRET;
     delete process.env.JWT_EXPIRES_IN;
     delete process.env.FRONTEND_URL;
-    
+
     // Close server if it's listening
     if (server && server.listening) {
       await new Promise<void>((resolve) => {
@@ -320,7 +321,7 @@ describe('Server Startup Integration Tests', () => {
     it('should register all API routes without errors', () => {
       // Get all registered routes
       const routes: Array<{ method: string; path: string }> = [];
-      
+
       app._router.stack.forEach((middleware: any) => {
         if (middleware.route) {
           // Direct route
@@ -337,7 +338,7 @@ describe('Server Startup Integration Tests', () => {
             .replace(/^\^\\?/, '')
             .replace(/\$.*$/, '')
             .replace(/\\\//g, '/');
-          
+
           if (middleware.handle && middleware.handle.stack) {
             middleware.handle.stack.forEach((route: any) => {
               if (route.route) {
@@ -357,7 +358,7 @@ describe('Server Startup Integration Tests', () => {
       // Verify that we have the expected API routes
       const expectedRoutePrefixes = [
         '/api/auth',
-        '/api/users', 
+        '/api/users',
         '/api/bookings',
         '/api/swaps',
         '/api/auctions',
@@ -367,7 +368,7 @@ describe('Server Startup Integration Tests', () => {
       ];
 
       expectedRoutePrefixes.forEach(prefix => {
-        const hasRouteWithPrefix = routes.some(route => 
+        const hasRouteWithPrefix = routes.some(route =>
           route.path.startsWith(prefix) || route.path.includes(prefix)
         );
         expect(hasRouteWithPrefix).toBe(true);
@@ -377,7 +378,7 @@ describe('Server Startup Integration Tests', () => {
     it('should have no undefined route handlers', () => {
       // Check that all route handlers are properly defined
       let hasUndefinedHandlers = false;
-      
+
       const checkLayer = (layer: any) => {
         if (layer.route) {
           // Check route handlers
@@ -391,7 +392,7 @@ describe('Server Startup Integration Tests', () => {
           if (typeof layer.handle !== 'function') {
             hasUndefinedHandlers = true;
           }
-          
+
           // If it's a router, check its stack too
           if (layer.handle.stack && Array.isArray(layer.handle.stack)) {
             layer.handle.stack.forEach(checkLayer);
@@ -400,7 +401,7 @@ describe('Server Startup Integration Tests', () => {
       };
 
       app._router.stack.forEach(checkLayer);
-      
+
       expect(hasUndefinedHandlers).toBe(false);
     });
   });
@@ -440,7 +441,7 @@ describe('Server Startup Integration Tests', () => {
       const response = await request(app)
         .post('/api/auth/challenge')
         .send({});
-      
+
       // Should not be a 404 (route not found), but likely 400 (bad request)
       expect(response.status).not.toBe(404);
     });
@@ -448,7 +449,7 @@ describe('Server Startup Integration Tests', () => {
     it('should have user routes properly registered', async () => {
       const response = await request(app)
         .get('/api/users/profile');
-      
+
       // Should not be a 404, likely 401 (unauthorized)
       expect(response.status).not.toBe(404);
     });
@@ -456,7 +457,7 @@ describe('Server Startup Integration Tests', () => {
     it('should have booking routes properly registered', async () => {
       const response = await request(app)
         .get('/api/bookings');
-      
+
       // Should not be a 404
       expect(response.status).not.toBe(404);
     });
@@ -464,7 +465,7 @@ describe('Server Startup Integration Tests', () => {
     it('should have swap routes properly registered', async () => {
       const response = await request(app)
         .get('/api/swaps');
-      
+
       // Should not be a 404
       expect(response.status).not.toBe(404);
     });
@@ -472,7 +473,7 @@ describe('Server Startup Integration Tests', () => {
     it('should have auction routes properly registered', async () => {
       const response = await request(app)
         .get('/api/auctions');
-      
+
       // Should not be a 404
       expect(response.status).not.toBe(404);
     });
@@ -480,7 +481,7 @@ describe('Server Startup Integration Tests', () => {
     it('should have payment routes properly registered', async () => {
       const response = await request(app)
         .get('/api/payments');
-      
+
       // Should not be a 404
       expect(response.status).not.toBe(404);
     });
@@ -488,7 +489,7 @@ describe('Server Startup Integration Tests', () => {
     it('should have notification routes properly registered', async () => {
       const response = await request(app)
         .get('/api/notifications');
-      
+
       // Should not be a 404
       expect(response.status).not.toBe(404);
     });
@@ -496,7 +497,7 @@ describe('Server Startup Integration Tests', () => {
     it('should have admin routes properly registered', async () => {
       const response = await request(app)
         .get('/api/admin/health');
-      
+
       // Should not be a 404
       expect(response.status).not.toBe(404);
     });
@@ -525,7 +526,7 @@ describe('Server Startup Integration Tests', () => {
   describe('Middleware Configuration', () => {
     it('should have security middleware configured', () => {
       // Check that helmet middleware is present (helmet middleware may have different names)
-      const hasHelmet = app._router.stack.some((layer: any) => 
+      const hasHelmet = app._router.stack.some((layer: any) =>
         layer.handle && (
           layer.handle.name === 'helmet' ||
           layer.handle.name === 'helmetMiddleware' ||
@@ -540,9 +541,9 @@ describe('Server Startup Integration Tests', () => {
 
     it('should have CORS middleware configured', () => {
       // Check that CORS middleware is present
-      const hasCors = app._router.stack.some((layer: any) => 
+      const hasCors = app._router.stack.some((layer: any) =>
         layer.handle && (
-          layer.handle.name === 'corsMiddleware' || 
+          layer.handle.name === 'corsMiddleware' ||
           layer.handle.name === 'cors'
         )
       );
@@ -551,7 +552,7 @@ describe('Server Startup Integration Tests', () => {
 
     it('should have rate limiting configured', () => {
       // Check that rate limiting middleware is present (rate limiting may have different names)
-      const hasRateLimit = app._router.stack.some((layer: any) => 
+      const hasRateLimit = app._router.stack.some((layer: any) =>
         layer.handle && (
           layer.handle.name === 'rateLimit' ||
           layer.handle.name === 'rateLimitMiddleware' ||

@@ -32,3 +32,6 @@ export * from './proposal-response.js';
 
 // Export wallet validation types
 export * from './wallet-validation.js';
+
+// Export swap completion types
+export * from './swap-completion.js';

@@ -5,8 +5,15 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
-import { authErrorHandler, handleAuthError } from '@/services/authErrorHandler';
-import { AuthErrorType, createErrorContext } from '@/types/authError';
+import { useDispatch } from 'react-redux';
+import { handleAuthError } from '@/services/authErrorHandler';
+import { createErrorContext } from '@/types/authError';
+import {
+  initializeFromAuthContext,
+  logout as reduxLogout,
+  setSyncStatus,
+  setSyncError
+} from '@/store/slices/authSlice';
 
 export interface User {
   id: string;
@@ -65,6 +72,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const dispatch = useDispatch();
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,6 +85,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
     return `${baseUrl}${endpoint}`;
   };
+
+  // Helper function to convert AuthContext User to Redux User format
+  const convertUserForRedux = (authUser: User) => {
+    return {
+      id: authUser.id,
+      walletAddress: '', // Will be populated by wallet context
+      displayName: authUser.username,
+      email: authUser.email,
+      verificationLevel: authUser.verificationLevel as 'basic' | 'verified' | 'premium',
+    };
+  };
+
+  // Sync user data to Redux when AuthContext user changes
+  useEffect(() => {
+    if (user && token && isStable) {
+      try {
+        const reduxUser = convertUserForRedux(user);
+        dispatch(initializeFromAuthContext({
+          user: reduxUser,
+          isAuthenticated: true,
+          syncSource: 'authContext'
+        }));
+
+        dispatch(setSyncStatus({
+          lastSyncTime: new Date(),
+          syncSource: 'authContext',
+          hasSyncError: false,
+          syncErrorMessage: null,
+        }));
+      } catch (error) {
+        console.error('Failed to sync user to Redux:', error);
+        dispatch(setSyncError(`Failed to sync user data: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      }
+    } else if (!user && !token && isStable) {
+      // Clear Redux store when user logs out
+      dispatch(reduxLogout());
+    }
+  }, [user, token, isStable, dispatch]);
 
   // Token validation function that checks JWT format, expiration, and required claims
   const validateToken = (tokenToValidate: string): TokenValidationResult => {
@@ -129,10 +175,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const validation = validateToken(savedToken);
 
           if (validation.isValid) {
+            const parsedUser = JSON.parse(savedUser);
             setToken(savedToken);
-            setUser(JSON.parse(savedUser));
+            setUser(parsedUser);
             setLastValidation(new Date());
             setIsStable(true);
+
+            // Immediately sync to Redux store from localStorage
+            try {
+              const reduxUser = convertUserForRedux(parsedUser);
+              dispatch(initializeFromAuthContext({
+                user: reduxUser,
+                isAuthenticated: true,
+                syncSource: 'localStorage'
+              }));
+
+              dispatch(setSyncStatus({
+                lastSyncTime: new Date(),
+                syncSource: 'localStorage',
+                hasSyncError: false,
+                syncErrorMessage: null,
+              }));
+            } catch (syncError) {
+              console.error('Failed to sync localStorage data to Redux:', syncError);
+              dispatch(setSyncError(`Failed to sync from localStorage: ${syncError instanceof Error ? syncError.message : 'Unknown error'}`));
+            }
           } else {
             console.log('🔒 LOGIN REDIRECT TRIGGERED by AuthContext (Token Validation):', {
               component: 'AuthContext',
@@ -153,6 +220,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               createErrorContext('/auth/initialize', 'token_validation')
             );
             clearAuthStorage();
+            // Clear Redux store as well
+            dispatch(reduxLogout());
           }
         } catch (error) {
           console.error('Error parsing saved user data:', error);
@@ -161,16 +230,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             createErrorContext('/auth/initialize', 'user_data_parsing')
           );
           clearAuthStorage();
+          // Clear Redux store as well
+          dispatch(reduxLogout());
         }
       } else {
         setIsStable(true); // No auth data is also a stable state
+        // Ensure Redux store is also cleared when no localStorage data
+        dispatch(reduxLogout());
       }
 
       setIsLoading(false);
     };
 
     initializeAuth();
-  }, []);
+  }, [dispatch]);
 
   // Periodic token validation (every 60 seconds) to detect expiration during active sessions
   useEffect(() => {
@@ -257,6 +330,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('auth_user', JSON.stringify(data.user));
 
+        // Immediately sync to Redux store
+        try {
+          const reduxUser = convertUserForRedux(data.user);
+          dispatch(initializeFromAuthContext({
+            user: reduxUser,
+            isAuthenticated: true,
+            syncSource: 'api'
+          }));
+
+          dispatch(setSyncStatus({
+            lastSyncTime: new Date(),
+            syncSource: 'api',
+            hasSyncError: false,
+            syncErrorMessage: null,
+          }));
+        } catch (syncError) {
+          console.error('Failed to sync login data to Redux:', syncError);
+          dispatch(setSyncError(`Failed to sync login data: ${syncError instanceof Error ? syncError.message : 'Unknown error'}`));
+        }
+
         setIsStable(true); // Mark as stable after successful login
       } else {
         throw new Error('Invalid response format');
@@ -311,6 +404,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         localStorage.setItem('auth_token', data.token);
         localStorage.setItem('auth_user', JSON.stringify(data.user));
 
+        // Immediately sync to Redux store
+        try {
+          const reduxUser = convertUserForRedux(data.user);
+          dispatch(initializeFromAuthContext({
+            user: reduxUser,
+            isAuthenticated: true,
+            syncSource: 'api'
+          }));
+
+          dispatch(setSyncStatus({
+            lastSyncTime: new Date(),
+            syncSource: 'api',
+            hasSyncError: false,
+            syncErrorMessage: null,
+          }));
+        } catch (syncError) {
+          console.error('Failed to sync registration data to Redux:', syncError);
+          dispatch(setSyncError(`Failed to sync registration data: ${syncError instanceof Error ? syncError.message : 'Unknown error'}`));
+        }
+
         setIsStable(true); // Mark as stable after successful registration
       } else {
         throw new Error('Invalid response format');
@@ -336,6 +449,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       clearAuthStorage();
       setIsStable(true); // Reset to stable state after logout
       setLastValidation(null);
+
+      // Clear Redux store as well
+      dispatch(reduxLogout());
     } finally {
       // Reset after a small delay to prevent rapid re-entry
       setTimeout(() => {

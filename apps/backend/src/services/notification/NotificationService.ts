@@ -674,6 +674,216 @@ export class NotificationService {
   }
 
   /**
+   * Send swap completion success notification to all involved users
+   * Requirements: 8.1, 8.2, 8.3
+   */
+  async sendSwapCompletionSuccessNotification(data: {
+    proposalId: string;
+    completionType: 'booking_exchange' | 'cash_payment';
+    completedSwaps: Array<{
+      swapId: string;
+      previousStatus: string;
+      newStatus: string;
+      completedAt: Date;
+    }>;
+    updatedBookings: Array<{
+      bookingId: string;
+      previousStatus: string;
+      newStatus: string;
+      swappedAt: Date;
+      newOwnerId?: string;
+    }>;
+    blockchainTransaction?: {
+      transactionId: string;
+      consensusTimestamp?: string;
+    };
+    completionTimestamp: Date;
+    proposerId: string;
+    targetUserId: string;
+    sourceSwapDetails: {
+      title: string;
+      location: string;
+      dates: string;
+      value: number;
+      accommodationType: string;
+      guests: number;
+    };
+    targetSwapDetails?: {
+      title: string;
+      location: string;
+      dates: string;
+      value: number;
+      accommodationType: string;
+      guests: number;
+    };
+    cashOffer?: {
+      amount: number;
+      currency: string;
+    };
+  }): Promise<void> {
+    const notificationData = {
+      proposalId: data.proposalId,
+      completionType: data.completionType,
+      completedSwaps: data.completedSwaps,
+      updatedBookings: data.updatedBookings,
+      blockchainTransaction: data.blockchainTransaction,
+      completionTimestamp: data.completionTimestamp,
+      sourceSwapDetails: data.sourceSwapDetails,
+      targetSwapDetails: data.targetSwapDetails,
+      cashOffer: data.cashOffer,
+      totalSwapsCompleted: data.completedSwaps.length,
+      totalBookingsUpdated: data.updatedBookings.length,
+      ownershipTransfersCount: data.updatedBookings.filter(b => b.newOwnerId).length,
+      isBookingExchange: data.completionType === 'booking_exchange',
+      isCashPayment: data.completionType === 'cash_payment',
+      hasBlockchainRecord: !!data.blockchainTransaction?.transactionId,
+      dashboardUrl: `${process.env.FRONTEND_URL}/dashboard`,
+    };
+
+    // Send notification to proposer
+    await this.sendNotification('swap_completion_success', data.proposerId, {
+      ...notificationData,
+      role: 'proposer',
+      title: 'Swap Proposal Accepted and Completed',
+      message: data.completionType === 'booking_exchange'
+        ? `Your booking exchange proposal has been accepted! ${data.completedSwaps.length} swap(s) completed and ${data.updatedBookings.length} booking(s) updated.`
+        : `Your cash offer has been accepted! Payment of ${data.cashOffer?.amount} ${data.cashOffer?.currency} has been processed.`,
+    });
+
+    // Send notification to target user (accepter)
+    await this.sendNotification('swap_completion_success', data.targetUserId, {
+      ...notificationData,
+      role: 'accepter',
+      title: 'Swap Completed Successfully',
+      message: data.completionType === 'booking_exchange'
+        ? `You have successfully completed a booking exchange! ${data.completedSwaps.length} swap(s) completed and ${data.updatedBookings.length} booking(s) updated.`
+        : `You have successfully accepted a cash offer of ${data.cashOffer?.amount} ${data.cashOffer?.currency}.`,
+    });
+  }
+
+  /**
+   * Send booking ownership transfer notifications for booking exchanges
+   * Requirements: 8.3, 8.4
+   */
+  async sendBookingOwnershipTransferNotification(data: {
+    proposalId: string;
+    bookingId: string;
+    previousOwnerId: string;
+    newOwnerId: string;
+    transferredAt: Date;
+    bookingDetails: {
+      title: string;
+      location: string;
+      dates: string;
+      value: number;
+      accommodationType: string;
+      guests: number;
+    };
+    exchangePartnerDetails: {
+      name: string;
+      bookingTitle: string;
+      bookingLocation: string;
+      bookingDates: string;
+    };
+  }): Promise<void> {
+    const notificationData = {
+      proposalId: data.proposalId,
+      bookingId: data.bookingId,
+      previousOwnerId: data.previousOwnerId,
+      newOwnerId: data.newOwnerId,
+      transferredAt: data.transferredAt,
+      bookingDetails: data.bookingDetails,
+      exchangePartnerDetails: data.exchangePartnerDetails,
+      dashboardUrl: `${process.env.FRONTEND_URL}/bookings/${data.bookingId}`,
+    };
+
+    // Send notification to new owner
+    await this.sendNotification('booking_ownership_transferred', data.newOwnerId, {
+      ...notificationData,
+      role: 'new_owner',
+      title: 'Booking Ownership Transferred to You',
+      message: `You are now the owner of "${data.bookingDetails.title}" in ${data.bookingDetails.location} (${data.bookingDetails.dates}) through a booking exchange with ${data.exchangePartnerDetails.name}.`,
+    });
+
+    // Send notification to previous owner
+    await this.sendNotification('booking_ownership_transferred', data.previousOwnerId, {
+      ...notificationData,
+      role: 'previous_owner',
+      title: 'Booking Ownership Transferred',
+      message: `Ownership of "${data.bookingDetails.title}" has been transferred to ${data.exchangePartnerDetails.name} as part of your booking exchange for "${data.exchangePartnerDetails.bookingTitle}".`,
+    });
+  }
+
+  /**
+   * Send completion validation warning notifications
+   * Requirements: 8.1, 8.5
+   */
+  async sendCompletionValidationWarningNotification(data: {
+    proposalId: string;
+    userId: string;
+    validationErrors: string[];
+    validationWarnings: string[];
+    inconsistentEntities: string[];
+    correctionAttempts?: Array<{
+      entityType: 'swap' | 'booking' | 'proposal';
+      entityId: string;
+      expectedStatus: string;
+      actualStatus: string;
+      correctionApplied: boolean;
+      correctionError?: string;
+    }>;
+    requiresManualReview: boolean;
+  }): Promise<void> {
+    await this.sendNotification('completion_validation_warning', data.userId, {
+      proposalId: data.proposalId,
+      validationErrors: data.validationErrors,
+      validationWarnings: data.validationWarnings,
+      inconsistentEntities: data.inconsistentEntities,
+      correctionAttempts: data.correctionAttempts,
+      requiresManualReview: data.requiresManualReview,
+      errorCount: data.validationErrors.length,
+      warningCount: data.validationWarnings.length,
+      inconsistentEntityCount: data.inconsistentEntities.length,
+      correctionAttemptCount: data.correctionAttempts?.length || 0,
+      successfulCorrections: data.correctionAttempts?.filter(c => c.correctionApplied).length || 0,
+      title: 'Swap Completion Validation Warning',
+      message: data.requiresManualReview
+        ? `Your swap completion has validation issues that require manual review. ${data.validationErrors.length} error(s) and ${data.validationWarnings.length} warning(s) detected.`
+        : `Your swap completion has minor validation warnings. ${data.validationWarnings.length} warning(s) detected but completion was successful.`,
+      dashboardUrl: `${process.env.FRONTEND_URL}/proposals/${data.proposalId}`,
+    });
+  }
+
+  /**
+   * Send swap completion failure notification
+   * Requirements: 8.1, 8.5
+   */
+  async sendSwapCompletionFailureNotification(data: {
+    proposalId: string;
+    userId: string;
+    errorMessage: string;
+    errorCode?: string;
+    affectedEntities?: string[];
+    rollbackSuccessful: boolean;
+    requiresManualIntervention: boolean;
+  }): Promise<void> {
+    await this.sendNotification('swap_completion_failed', data.userId, {
+      proposalId: data.proposalId,
+      errorMessage: data.errorMessage,
+      errorCode: data.errorCode,
+      affectedEntities: data.affectedEntities,
+      rollbackSuccessful: data.rollbackSuccessful,
+      requiresManualIntervention: data.requiresManualIntervention,
+      affectedEntityCount: data.affectedEntities?.length || 0,
+      title: 'Swap Completion Failed',
+      message: data.rollbackSuccessful
+        ? `Your swap completion failed but all changes have been rolled back successfully. Error: ${data.errorMessage}`
+        : `Your swap completion failed and rollback was unsuccessful. Manual intervention may be required. Error: ${data.errorMessage}`,
+      dashboardUrl: `${process.env.FRONTEND_URL}/proposals/${data.proposalId}`,
+    });
+  }
+
+  /**
    * Send auction unavailability explanation
    */
   async sendAuctionUnavailableNotification(data: {
@@ -1069,6 +1279,11 @@ export class NotificationService {
       proposal_rejected: 'Proposal Rejected',
       proposal_payment_completed: 'Payment Completed',
       proposal_payment_failed: 'Payment Failed',
+      // Swap completion notifications
+      swap_completion_success: 'Swap Completed Successfully',
+      swap_completion_failed: 'Swap Completion Failed',
+      booking_ownership_transferred: 'Booking Ownership Transferred',
+      completion_validation_warning: 'Completion Validation Warning',
     };
     return titles[type] || 'Notification';
   }

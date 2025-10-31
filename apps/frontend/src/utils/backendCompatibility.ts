@@ -46,7 +46,7 @@ export interface ApiRequestConfig {
 const DEFAULT_API_CONFIG: ApiRequestConfig = {
     autoSanitize: true,
     validateCompliance: true,
-    logActions: process.env.NODE_ENV === 'development',
+    logActions: import.meta.env.DEV,
     onComplianceError: (errors) => {
         console.warn('API request compliance violations:', errors);
     },
@@ -168,7 +168,7 @@ export interface ApiResponseConfig {
 const DEFAULT_RESPONSE_CONFIG: ApiResponseConfig = {
     autoSanitize: true,
     filterDisabledFeatures: true,
-    logActions: process.env.NODE_ENV === 'development',
+    logActions: import.meta.env.DEV,
     onUnexpectedFeatureData: (data) => {
         console.warn('Received unexpected feature data from backend:', data);
     },

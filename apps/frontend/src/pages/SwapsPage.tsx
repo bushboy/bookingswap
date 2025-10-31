@@ -28,7 +28,9 @@ import { validateAndExecuteTargetingCall } from '@/services/targetingAuthValidat
 import { generateTargetingSuccessFeedback } from '@/services/targetingFeedbackService';
 
 export const SwapsPage: React.FC = () => {
-  console.log('SwapsPage: Component mounting/remounting');
+  const isDev = import.meta.env.DEV;
+  const debugSwaps = import.meta.env.VITE_DEBUG_SWAPS === 'true';
+  if (debugSwaps) console.log('SwapsPage: Component mounting/remounting');
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -66,7 +68,7 @@ export const SwapsPage: React.FC = () => {
     maxRetries: 2,
     retryDelay: 1500,
     onError: (error) => {
-      console.warn('SwapsPage: Targeting data error (main auth preserved):', error);
+      if (debugSwaps) console.warn('SwapsPage: Targeting data error (main auth preserved):', error);
 
       // Use the enhanced feedback message if available
       if (error.feedbackMessage) {
@@ -91,10 +93,10 @@ export const SwapsPage: React.FC = () => {
       }
     },
     onSuccess: (data) => {
-      console.log('SwapsPage: Targeting data loaded successfully for swap:', data.swapId);
+      if (debugSwaps) console.log('SwapsPage: Targeting data loaded successfully for swap:', data.swapId);
 
       // Show success feedback only in development or for first-time loads
-      if (process.env.NODE_ENV === 'development' || !hasTargetingData(data.swapId)) {
+      if (debugSwaps || !hasTargetingData(data.swapId)) {
         const successFeedback = generateTargetingSuccessFeedback(
           'get_status',
           { swapId: data.swapId, operation: 'get_status' }
@@ -198,28 +200,28 @@ export const SwapsPage: React.FC = () => {
       // Navigate to manage the specific swap
       // For now, we'll just show the swaps page with the specific swap highlighted
       // In a full implementation, this could open a swap management modal
-      console.log('Managing swap:', manageSwapId);
+      if (debugSwaps) console.log('Managing swap:', manageSwapId);
       // TODO: Implement swap management functionality
     }
   }, [bookingId, manageSwapId]);
 
   // Load swaps from database
   React.useEffect(() => {
-    console.log('SwapsPage: useEffect triggered - user:', !!user?.id);
+    if (debugSwaps) console.log('SwapsPage: useEffect triggered - user:', !!user?.id);
     // Only load swaps if we have a user
     if (user?.id) {
-      console.log('SwapsPage: Loading swaps for user:', user.id);
+      if (debugSwaps) console.log('SwapsPage: Loading swaps for user:', user.id);
       loadSwaps();
       // Note: loadUserProposals is now handled by useOptimizedProposalData hook
     } else {
-      console.log('SwapsPage - Waiting for user authentication, user:', !!user?.id);
+      if (debugSwaps) console.log('SwapsPage - Waiting for user authentication, user:', !!user?.id);
     }
   }, [user?.id, activeTab, sortBy, sortOrder, searchQuery]);
 
   // Skip targeting data loading to prevent repeated API calls
   React.useEffect(() => {
     if (loadingPhase === 'targeting') {
-      console.log('SwapsPage: Skipping targeting data load to prevent repeated API calls');
+      if (debugSwaps) console.log('SwapsPage: Skipping targeting data load to prevent repeated API calls');
       setLoadingPhase('complete');
     }
   }, [loadingPhase]);
@@ -227,7 +229,7 @@ export const SwapsPage: React.FC = () => {
   // Handle targeting data loading completion
   React.useEffect(() => {
     if (loadingPhase === 'complete') {
-      console.log('SwapsPage: Data loading complete. Targeting state:', {
+      if (debugSwaps) console.log('SwapsPage: Data loading complete. Targeting state:', {
         hasError: !!targetingState.error,
         dataCount: Object.keys(targetingState.data).length,
         isLoading: targetingState.isLoading
@@ -240,7 +242,7 @@ export const SwapsPage: React.FC = () => {
     if (!user?.id) return;
 
     const handleProposalUpdate = (update: ProposalUpdate) => {
-      console.log('Received proposal update:', update);
+      if (debugSwaps) console.log('Received proposal update:', update);
 
       // Use the optimized real-time update handler
       handleOptimizedRealTimeUpdate(update);
@@ -394,14 +396,14 @@ export const SwapsPage: React.FC = () => {
     userId: user?.id,
     autoConnect: true,
     onProposalStatusUpdate: (update) => {
-      console.log('Received real-time proposal update:', update);
+      if (debugSwaps) console.log('Received real-time proposal update:', update);
       // Refresh proposals when we get real-time updates
       if (user?.id) {
         loadUserProposals();
       }
     },
     onConnectionChange: (isConnected) => {
-      console.log('Proposal WebSocket connection changed:', isConnected);
+      if (debugSwaps) console.log('Proposal WebSocket connection changed:', isConnected);
     },
     onConnectionError: (error) => {
       console.error('Proposal WebSocket connection error:', error);
@@ -409,12 +411,12 @@ export const SwapsPage: React.FC = () => {
   });
 
   const loadSwaps = async () => {
-    console.log('SwapsPage - loadSwaps called, user:', user?.id);
-    console.log('SwapsPage - token exists:', !!token);
-    console.log('SwapsPage - localStorage token exists:', !!localStorage.getItem('auth_token'));
+    if (debugSwaps) console.log('SwapsPage - loadSwaps called, user:', user?.id);
+    if (debugSwaps) console.log('SwapsPage - token exists:', !!token);
+    if (debugSwaps) console.log('SwapsPage - localStorage token exists:', !!localStorage.getItem('auth_token'));
 
     if (!user?.id) {
-      console.log('SwapsPage - No user available, skipping API call');
+      if (debugSwaps) console.log('SwapsPage - No user available, skipping API call');
       setLoadingPhase('error');
       setSwapDataState(prev => ({
         ...prev,
@@ -481,7 +483,22 @@ export const SwapsPage: React.FC = () => {
         retryCount: 0
       }));
 
-      console.log(`SwapsPage - Successfully loaded ${swapCardData.length} swaps`);
+      if (debugSwaps) console.log(`SwapsPage - Successfully loaded ${swapCardData.length} swaps`);
+
+      // Debug: Log proposal data for each swap
+      if (debugSwaps) {
+        swapCardData.forEach(swap => {
+          console.log(`[SwapsPage] Swap ${swap.userSwap.id} proposals:`, {
+            proposalCount: swap.proposalCount,
+            proposalsFromOthers: swap.proposalsFromOthers?.length || 0,
+            proposalDetails: swap.proposalsFromOthers?.map(p => ({
+              id: p.id,
+              status: p.status,
+              proposerName: p.proposerName
+            })) || []
+          });
+        });
+      }
     } catch (error) {
       console.error('Failed to load swaps:', error);
 
@@ -553,7 +570,7 @@ export const SwapsPage: React.FC = () => {
   const handleAcceptTarget = async (targetId: string, proposalId: string) => {
     const result = await validateAndExecuteTargetingCall(
       async () => {
-        console.log('Accepting targeting proposal:', { targetId, proposalId });
+        if (debugSwaps) console.log('Accepting targeting proposal:', { targetId, proposalId });
         // TODO: Implement targeting proposal acceptance API
         return await swapTargetingService.acceptTargetingProposal('', targetId, proposalId);
       },
@@ -582,7 +599,7 @@ export const SwapsPage: React.FC = () => {
   const handleRejectTarget = async (targetId: string, proposalId: string) => {
     const result = await validateAndExecuteTargetingCall(
       async () => {
-        console.log('Rejecting targeting proposal:', { targetId, proposalId });
+        if (debugSwaps) console.log('Rejecting targeting proposal:', { targetId, proposalId });
         // TODO: Implement targeting proposal rejection API
         return await swapTargetingService.rejectTargetingProposal('', targetId, proposalId);
       },
@@ -672,13 +689,13 @@ export const SwapsPage: React.FC = () => {
 
   // Enhanced user feedback handlers
   const handleRetrySwapData = async () => {
-    console.log('SwapsPage: Retrying swap data load');
+    if (debugSwaps) console.log('SwapsPage: Retrying swap data load');
     setUserFeedback({ message: null, type: 'info', isTargetingRelated: false, showRetryOption: false });
     await loadSwaps();
   };
 
   const handleRetryTargetingData = async () => {
-    console.log('SwapsPage: Retrying targeting data load');
+    if (debugSwaps) console.log('SwapsPage: Retrying targeting data load');
 
     // Show retry in progress feedback
     const retryFeedback = generateTargetingSuccessFeedback(
@@ -722,7 +739,7 @@ export const SwapsPage: React.FC = () => {
       } catch (error) {
         // The error will be handled by the onError callback in useTargetingData
         // which will set appropriate feedback messages
-        console.warn('SwapsPage: Retry failed, error handled by useTargetingData hook');
+        if (debugSwaps) console.warn('SwapsPage: Retry failed, error handled by useTargetingData hook');
       }
     }
   };
@@ -1162,10 +1179,12 @@ export const SwapsPage: React.FC = () => {
           })().map(swapCardData => {
             // Create handlers that include loading state management
             const handleAcceptProposalWrapper = async (proposalId: string) => {
+              console.log(`[SwapsPage] Accept proposal wrapper called for ${proposalId}`);
               try {
                 // For the simplified schema, proposalId IS the swap_targets.id for booking proposals
                 // and swap_proposals.id for cash proposals. The backend expects the same ID for both.
                 // No need to pass swapTargetId separately - it's the same as proposalId.
+                console.log(`[SwapsPage] Calling handleAcceptProposal for ${proposalId}`);
                 await handleAcceptProposal(proposalId, undefined, undefined);
                 // Cache invalidation and optimistic updates are handled automatically
                 // Reload swaps to show updated status
@@ -1177,10 +1196,12 @@ export const SwapsPage: React.FC = () => {
             };
 
             const handleRejectProposalWrapper = async (proposalId: string, reason?: string) => {
+              console.log(`[SwapsPage] Reject proposal wrapper called for ${proposalId}`, { reason });
               try {
                 // For the simplified schema, proposalId IS the swap_targets.id for booking proposals
                 // and swap_proposals.id for cash proposals. The backend expects the same ID for both.
                 // No need to pass swapTargetId separately - it's the same as proposalId.
+                console.log(`[SwapsPage] Calling handleRejectProposal for ${proposalId}`);
                 await handleRejectProposal(proposalId, reason, undefined, undefined);
                 // Cache invalidation and optimistic updates are handled automatically
                 // Reload swaps to show updated status

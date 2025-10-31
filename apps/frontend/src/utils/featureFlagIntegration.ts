@@ -14,6 +14,8 @@ import React from 'react';
 import { FeatureFlagErrorBoundary, withFeatureFlagErrorBoundary } from '@/components/error/FeatureFlagErrorBoundary';
 import { getFeatureFlagService, withFeatureFlagCompatibility } from '@/services/featureFlagService';
 import { FEATURE_FLAGS } from '@/config/featureFlags';
+import { Component } from 'lucide-react';
+import { Component } from 'lucide-react';
 
 // ============================================================================
 // Component Integration Utilities
@@ -321,7 +323,7 @@ export const FeatureFlagDebugger: React.FC<{
     const service = getFeatureFlagService();
     const [isOpen, setIsOpen] = React.useState(false);
 
-    if (process.env.NODE_ENV !== 'development') {
+    if (!import.meta.env.DEV) {
         return null;
     }
 

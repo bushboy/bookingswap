@@ -194,7 +194,7 @@ function isTokenValid(token: string): boolean {
 /**
  * Auto-initialize debug tools in development
  */
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
     // Auto-initialize in development mode
     setTimeout(() => {
         initializeTargetingAuthDebug();

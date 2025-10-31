@@ -6,6 +6,7 @@ import {
   WalletErrorType,
   NetworkType,
 } from '../../types/wallet';
+import { WALLET_CONFIG } from '../../config/wallet';
 
 /**
  * Mock wallet adapter for testing and development
@@ -16,16 +17,16 @@ export class MockWalletAdapter extends BaseWalletAdapter {
   public readonly name = 'Mock Wallet (Testing)';
   public readonly icon = '/icons/mock-wallet.svg';
 
-  private mockAccountId = '0.0.123456';
-  private mockBalance = '100.50';
-  private mockNetwork: NetworkType = 'testnet';
+  private mockAccountId = WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT;
+  private mockBalance = WALLET_CONFIG.DEFAULT_BALANCE.toString();
+  private mockNetwork: NetworkType = WALLET_CONFIG.NETWORK as NetworkType;
   private isConnectedState = false;
 
   /**
-   * Mock wallet is always available for testing
+   * Mock wallet is always available for testing (synchronous)
    */
   public async isAvailable(): Promise<boolean> {
-    return true;
+    return Promise.resolve(true);
   }
 
   /**
@@ -33,8 +34,8 @@ export class MockWalletAdapter extends BaseWalletAdapter {
    */
   public async connect(): Promise<WalletConnection> {
     try {
-      // Simulate connection delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Simulate minimal connection delay for development
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Simulate user approval (90% success rate for testing)
       if (Math.random() < 0.1) {

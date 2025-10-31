@@ -6,6 +6,7 @@ import {
   isBookingTypeEnabled,
   getEnabledBookingTypes
 } from '../config/booking-types.js';
+import { BookingSwapCompletion } from './swap-completion.js';
 
 // Re-export types for backward compatibility
 export type { EnabledBookingType, AccommodationType };
@@ -70,4 +71,5 @@ export interface Booking extends BaseEntity {
   verification: BookingVerification;
   blockchain: BookingBlockchain;
   status: BookingStatus;
+  swapCompletion?: BookingSwapCompletion;
 }

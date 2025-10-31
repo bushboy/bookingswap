@@ -61,13 +61,13 @@ export class PerformanceMonitor {
   startTimer(operationName: string, metadata?: Record<string, any>): string {
     const timerId = `${operationName}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const startTime = performance.now();
-    
+
     this.activeTimers.set(timerId, startTime);
-    
+
     if (this.config.enableDetailedLogging) {
       console.log(`[PerformanceMonitor] Started: ${operationName}`, metadata);
     }
-    
+
     return timerId;
   }
 
@@ -83,7 +83,7 @@ export class PerformanceMonitor {
 
     const endTime = performance.now();
     const duration = endTime - startTime;
-    
+
     this.activeTimers.delete(timerId);
 
     const metric: PerformanceMetric = {
@@ -97,12 +97,12 @@ export class PerformanceMonitor {
     };
 
     this.recordMetric(metric);
-    
+
     if (this.config.enableConsoleLogging) {
       const status = success ? 'SUCCESS' : 'ERROR';
       const durationFormatted = duration.toFixed(2);
       console.log(`[PerformanceMonitor] ${status}: ${operationName} (${durationFormatted}ms)`, metadata);
-      
+
       if (duration > this.config.slowOperationThreshold) {
         console.warn(`[PerformanceMonitor] SLOW OPERATION: ${operationName} took ${durationFormatted}ms`);
       }
@@ -140,9 +140,9 @@ export class PerformanceMonitor {
     const durations = operationMetrics
       .filter(m => m.duration !== undefined)
       .map(m => m.duration!);
-    
+
     const successfulOperations = operationMetrics.filter(m => m.success !== false);
-    
+
     const totalDuration = durations.reduce((sum, duration) => sum + duration, 0);
     const averageDuration = durations.length > 0 ? totalDuration / durations.length : 0;
     const minDuration = durations.length > 0 ? Math.min(...durations) : 0;
@@ -177,7 +177,7 @@ export class PerformanceMonitor {
    * Get slow operations (above threshold)
    */
   getSlowOperations(): PerformanceStats[] {
-    return this.getAllStats().filter(stats => 
+    return this.getAllStats().filter(stats =>
       stats.averageDuration > this.config.slowOperationThreshold
     );
   }
@@ -186,7 +186,7 @@ export class PerformanceMonitor {
    * Get operations with low success rates
    */
   getUnreliableOperations(threshold = 90): PerformanceStats[] {
-    return this.getAllStats().filter(stats => 
+    return this.getAllStats().filter(stats =>
       stats.successRate < threshold && stats.count >= 5
     );
   }
@@ -220,11 +220,11 @@ export class PerformanceMonitor {
     const allStats = this.getAllStats();
     const slowOperations = this.getSlowOperations();
     const unreliableOperations = this.getUnreliableOperations();
-    
+
     const totalOperations = allStats.reduce((sum, stats) => sum + stats.count, 0);
     const totalDuration = allStats.reduce((sum, stats) => sum + stats.totalDuration, 0);
     const averageResponseTime = totalOperations > 0 ? totalDuration / totalOperations : 0;
-    
+
     const topOperationsByFrequency = [...allStats]
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
@@ -262,7 +262,7 @@ export class PerformanceMonitor {
     metadata?: Record<string, any>
   ): Promise<T> {
     const timerId = this.startTimer(operationName, metadata);
-    
+
     try {
       const result = await operation();
       this.endTimer(timerId, operationName, true, undefined, metadata);
@@ -283,7 +283,7 @@ export class PerformanceMonitor {
     metadata?: Record<string, any>
   ): T {
     const timerId = this.startTimer(operationName, metadata);
-    
+
     try {
       const result = operation();
       this.endTimer(timerId, operationName, true, undefined, metadata);
@@ -303,9 +303,9 @@ export class ApiPerformanceMonitor extends PerformanceMonitor {
   constructor() {
     super({
       maxMetricsPerOperation: 100,
-      enableConsoleLogging: process.env.NODE_ENV === 'development',
+      enableConsoleLogging: import.meta.env.DEV,
       slowOperationThreshold: 3000, // 3 seconds for API calls
-      enableDetailedLogging: process.env.NODE_ENV === 'development',
+      enableDetailedLogging: import.meta.env.DEV,
     });
   }
 
@@ -337,7 +337,7 @@ export class ApiPerformanceMonitor extends PerformanceMonitor {
     errorProneEndpoints: PerformanceStats[];
     averageApiResponseTime: number;
   } {
-    const apiStats = this.getAllStats().filter(stats => 
+    const apiStats = this.getAllStats().filter(stats =>
       stats.name.startsWith('API_')
     );
 

@@ -224,7 +224,7 @@ export function useTargetingData(options: UseTargetingDataOptions = {}): UseTarg
                 }));
 
                 // Generate success feedback message (optional, for debugging)
-                if (process.env.NODE_ENV === 'development') {
+                if (import.meta.env.DEV) {
                     const successFeedback = generateTargetingSuccessFeedback(
                         'get_status',
                         { swapId, operation: 'get_status' },
@@ -256,7 +256,7 @@ export function useTargetingData(options: UseTargetingDataOptions = {}): UseTarg
                         retryCount: targetingState.retryCount
                     },
                     {
-                        showTechnicalDetails: process.env.NODE_ENV === 'development',
+                        showTechnicalDetails: import.meta.env.DEV,
                         includeRetryOption: true,
                         customRetryText: 'Retry Targeting Data'
                     }
@@ -324,7 +324,7 @@ export function useTargetingData(options: UseTargetingDataOptions = {}): UseTarg
                     retryCount: targetingState.retryCount
                 },
                 {
-                    showTechnicalDetails: process.env.NODE_ENV === 'development',
+                    showTechnicalDetails: import.meta.env.DEV,
                     includeRetryOption: true,
                     customRetryText: 'Retry Loading'
                 }

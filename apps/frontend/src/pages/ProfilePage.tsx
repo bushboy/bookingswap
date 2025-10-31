@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { tokens } from '@/design-system/tokens';
+import { WALLET_CONFIG } from '../../tests/fixtures/wallet-config';
 
 export const ProfilePage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
@@ -293,7 +294,7 @@ export const ProfilePage: React.FC = () => {
                     wordBreak: 'break-all' as const,
                   }}
                 >
-                  0.0.123456789
+                  {WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: tokens.spacing[3] }}>
@@ -317,7 +318,7 @@ export const ProfilePage: React.FC = () => {
                   variant="ghost"
                   onClick={() =>
                     window.open(
-                      'https://hashscan.io/testnet/account/0.0.123456789',
+                      `https://hashscan.io/testnet/account/${WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT}`,
                       '_blank'
                     )
                   }

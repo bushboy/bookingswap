@@ -155,6 +155,10 @@ export class NotificationService {
       payment_processing: '⏳',
       payment_completed: '💰',
       payment_failed: '⚠️',
+      swap_completion_success: '🎉',
+      swap_completion_failed: '❌',
+      booking_ownership_transferred: '🔄',
+      completion_validation_warning: '⚠️',
     };
     return icons[type] || '📢';
   }
@@ -176,6 +180,10 @@ export class NotificationService {
       payment_processing: 'blue',
       payment_completed: 'green',
       payment_failed: 'red',
+      swap_completion_success: 'green',
+      swap_completion_failed: 'red',
+      booking_ownership_transferred: 'blue',
+      completion_validation_warning: 'orange',
     };
     return colors[type] || 'gray';
   }

@@ -204,7 +204,7 @@ export function logBookingError(error: EnhancedBookingError, context?: {
     });
 
     // In production, this would send to monitoring service
-    if (process.env.NODE_ENV === 'production') {
+    if (import.meta.env.PROD) {
         // Send to monitoring service (e.g., Sentry, LogRocket, etc.)
         // monitoringService.captureException(error, context);
     }

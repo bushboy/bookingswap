@@ -1,17 +1,21 @@
 import { Request, Response } from 'express';
 import { ProposalAcceptanceService, ProposalAcceptanceRequest } from '../services/swap/ProposalAcceptanceService';
 import { SwapRepository } from '../database/repositories/SwapRepository';
+import { SwapCompletionOrchestrator } from '../services/swap/SwapCompletionOrchestrator';
+import { CompletionValidationService } from '../services/swap/CompletionValidationService';
 import { logger } from '../utils/logger';
 import { handleSwapError, generateRequestId, SWAP_ERROR_CODES } from '../utils/swap-error-handler';
 
 export class ProposalController {
     constructor(
         private proposalAcceptanceService: ProposalAcceptanceService,
-        private swapRepository: SwapRepository
+        private swapRepository: SwapRepository,
+        private completionOrchestrator?: SwapCompletionOrchestrator,
+        private completionValidationService?: CompletionValidationService
     ) { }
 
     /**
-     * Accept a proposal
+     * Accept a proposal with optional completion workflow
      * POST /api/proposals/:proposalId/accept
      */
     acceptProposal = async (req: Request, res: Response): Promise<void> => {
@@ -60,14 +64,16 @@ export class ProposalController {
                 return;
             }
 
-            // Extract swapTargetId from request body - this is the correct ID for swap_targets table lookups
-            const { swapTargetId } = req.body;
+            // Extract completion flags and swapTargetId from request body
+            const { swapTargetId, ensureCompletion = false, validationLevel = 'basic' } = req.body;
 
             logger.info('Processing proposal acceptance', {
                 requestId,
                 userId,
                 proposalId,
                 swapTargetId,
+                ensureCompletion,
+                validationLevel,
                 usingSwapTargetId: !!swapTargetId
             });
 
@@ -78,28 +84,103 @@ export class ProposalController {
                 swapTargetId
             };
 
-            const result = await this.proposalAcceptanceService.acceptProposal(acceptanceRequest);
+            // Use completion workflow if requested and available
+            if (ensureCompletion && this.completionOrchestrator) {
+                try {
+                    // First accept the proposal normally
+                    const acceptanceResult = await this.proposalAcceptanceService.acceptProposal(acceptanceRequest);
 
-            logger.info('Proposal accepted successfully', {
-                requestId,
-                userId,
-                proposalId,
-                hasPayment: !!result.paymentTransaction,
-                hasSwap: !!result.swap,
-                blockchainTxId: result.blockchainTransaction.transactionId
-            });
+                    // Then orchestrate completion workflow
+                    const completionRequest = {
+                        proposalId: acceptanceResult.proposal.id,
+                        acceptingUserId: userId,
+                        proposalType: acceptanceResult.paymentTransaction ? 'cash' as const : 'booking' as const,
+                        sourceSwapId: acceptanceResult.swap?.id || '',
+                        targetSwapId: undefined, // Would be derived from proposal
+                        paymentTransactionId: acceptanceResult.paymentTransaction?.id
+                    };
 
-            res.status(200).json({
-                success: true,
-                data: {
-                    proposal: result.proposal,
-                    swap: result.swap,
-                    paymentTransaction: result.paymentTransaction,
-                    blockchain: result.blockchainTransaction
-                },
-                requestId,
-                timestamp: new Date().toISOString()
-            });
+                    const completionResult = await this.completionOrchestrator.completeSwapExchange(completionRequest);
+
+                    // Validate completion if comprehensive validation requested
+                    let validationResult;
+                    if (validationLevel === 'comprehensive' && this.completionValidationService) {
+                        validationResult = await this.completionValidationService.validatePostCompletion(
+                            completionResult.completedSwaps,
+                            completionResult.updatedBookings,
+                            completionResult.proposal
+                        );
+                    }
+
+                    logger.info('Proposal accepted with completion workflow', {
+                        requestId,
+                        userId,
+                        proposalId,
+                        completionId: completionResult.completionTimestamp,
+                        hasValidation: !!validationResult,
+                        blockchainTxId: completionResult.blockchainTransaction.transactionId
+                    });
+
+                    res.status(200).json({
+                        success: true,
+                        data: {
+                            proposal: completionResult.proposal,
+                            completion: completionResult,
+                            validation: validationResult
+                        },
+                        requestId,
+                        timestamp: new Date().toISOString()
+                    });
+
+                } catch (completionError: any) {
+                    logger.error('Completion workflow failed, falling back to standard acceptance', {
+                        requestId,
+                        userId,
+                        proposalId,
+                        completionError: completionError.message
+                    });
+
+                    // Fall back to standard acceptance if completion fails
+                    const result = await this.proposalAcceptanceService.acceptProposal(acceptanceRequest);
+
+                    res.status(200).json({
+                        success: true,
+                        data: {
+                            proposal: result.proposal,
+                            swap: result.swap,
+                            paymentTransaction: result.paymentTransaction,
+                            blockchain: result.blockchainTransaction
+                        },
+                        warnings: ['Completion workflow failed, proposal accepted without completion'],
+                        requestId,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            } else {
+                // Standard proposal acceptance without completion workflow
+                const result = await this.proposalAcceptanceService.acceptProposal(acceptanceRequest);
+
+                logger.info('Proposal accepted successfully', {
+                    requestId,
+                    userId,
+                    proposalId,
+                    hasPayment: !!result.paymentTransaction,
+                    hasSwap: !!result.swap,
+                    blockchainTxId: result.blockchainTransaction.transactionId
+                });
+
+                res.status(200).json({
+                    success: true,
+                    data: {
+                        proposal: result.proposal,
+                        swap: result.swap,
+                        paymentTransaction: result.paymentTransaction,
+                        blockchain: result.blockchainTransaction
+                    },
+                    requestId,
+                    timestamp: new Date().toISOString()
+                });
+            }
 
         } catch (error: any) {
             handleSwapError(error, res, {

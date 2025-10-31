@@ -3,6 +3,7 @@ import request from 'supertest';
 import { Express } from 'express';
 import { createApp } from '../index';
 import { BookingType } from '@booking-swap/shared';
+import { WALLET_CONFIG } from '../../../../tests/fixtures/wallet-config';
 
 // Mock external dependencies for integration tests
 vi.mock('../database', () => ({
@@ -47,7 +48,7 @@ vi.mock('../database/repositories/UserRepository', () => ({
     updateLastActive: vi.fn(),
     findById: vi.fn().mockResolvedValue({
       id: 'test-user-id',
-      walletAddress: '0.0.123456',
+      walletAddress: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT,
       profile: { preferences: { notifications: true } },
       verification: { level: 'basic', documents: [] },
       reputation: { score: 100, completedSwaps: 0, cancelledSwaps: 0, reviews: [] },
@@ -190,7 +191,7 @@ describe('Swap Proposal Endpoint Integration Tests', () => {
           email: 'test@example.com',
           password: 'password123'
         });
-      
+
       authToken = loginResponse.body.token || loginResponse.body.data?.token;
       testUserId = loginResponse.body.user?.id || loginResponse.body.data?.user?.id;
     }
@@ -669,7 +670,7 @@ describe('Swap Proposal Endpoint Integration Tests', () => {
       // Mock timeout error
       const timeoutError = new Error('Request timeout') as any;
       timeoutError.code = 'TIMEOUT';
-      
+
       const mockSwapRepo = vi.mocked(require('../database/repositories/SwapRepository').SwapRepository);
       mockSwapRepo.prototype.create.mockRejectedValueOnce(timeoutError);
 
@@ -838,7 +839,7 @@ describe('Swap Proposal Endpoint Integration Tests', () => {
       // Track all service calls
       const mockSwapRepo = vi.mocked(require('../database/repositories/SwapRepository').SwapRepository);
       const mockHederaService = vi.mocked(require('../services/hedera/factory').createHederaService);
-      
+
       const response = await request(app)
         .post(`/api/swaps/${targetSwapId}/proposals`)
         .set('Authorization', `Bearer ${authToken}`)
@@ -849,14 +850,14 @@ describe('Swap Proposal Endpoint Integration Tests', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.proposalId).toBeDefined();
       expect(response.body.data.status).toBe('pending');
-      
+
       // Verify database interactions
       expect(mockSwapRepo.prototype.findById).toHaveBeenCalled();
       expect(mockSwapRepo.prototype.create).toHaveBeenCalled();
-      
+
       // Verify blockchain interaction
       expect(mockHederaService().submitTransaction).toHaveBeenCalled();
-      
+
       // Verify response contains all expected data
       expect(response.body.data.swap.terms.conditions).toEqual(proposalData.conditions);
       expect(response.body.data.blockchainTransaction.transactionId).toBe('test-tx-id');

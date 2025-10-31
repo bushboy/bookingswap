@@ -336,7 +336,7 @@ export function logSanitizationAction(
     originalData: any,
     sanitizedData: any
 ): void {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
         console.log(`🧹 Data Sanitization: ${action}`, {
             original: originalData,
             sanitized: sanitizedData,
@@ -728,7 +728,7 @@ export function createSanitizationErrorBoundary(functionName: string) {
             console.error(`Sanitization error in ${functionName}:`, error);
 
             // Log the error for debugging but don't break the UI
-            if (process.env.NODE_ENV === 'development') {
+            if (import.meta.env.DEV) {
                 console.log('Original data that caused error:', data);
             }
 

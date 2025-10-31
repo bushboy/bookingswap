@@ -1181,6 +1181,378 @@ export class NotificationTemplateService {
       template: '⚠️ Payment failed: {{amount}} {{currency}}{{#if errorMessage}} - {{errorMessage}}{{/if}}',
       variables: ['amount', 'currency', 'errorMessage']
     });
+
+    // Swap Completion Notification Templates - Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
+
+    // Swap Completion Success Templates
+    this.addTemplate({
+      type: 'swap_completion_success',
+      channel: 'email',
+      subject: '🎉 Swap Completed Successfully - {{#if isBookingExchange}}Booking Exchange{{else}}Cash Payment{{/if}}',
+      template: '<h2>🎉 Congratulations! Your Swap Has Been Completed Successfully!</h2>' +
+        '<p>Hello {{recipientName}},</p>' +
+        '<p>{{#if (eq role "proposer")}}Your {{#if isBookingExchange}}booking exchange{{else}}cash offer{{/if}} proposal has been accepted and completed!{{else}}You have successfully completed a {{#if isBookingExchange}}booking exchange{{else}}cash payment{{/if}}!{{/if}}</p>' +
+
+        '<div style="background-color: #d4edda; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #28a745;">' +
+        '<h3>✅ Completion Summary</h3>' +
+        '<p><strong>Proposal ID:</strong> {{proposalId}}</p>' +
+        '<p><strong>Completion Type:</strong> {{#if isBookingExchange}}Booking Exchange{{else}}Cash Payment{{/if}}</p>' +
+        '<p><strong>Completed At:</strong> {{completionTimestamp}}</p>' +
+        '<p><strong>Swaps Completed:</strong> {{totalSwapsCompleted}}</p>' +
+        '<p><strong>Bookings Updated:</strong> {{totalBookingsUpdated}}</p>' +
+        '{{#if ownershipTransfersCount}}<p><strong>Ownership Transfers:</strong> {{ownershipTransfersCount}}</p>{{/if}}' +
+        '{{#if hasBlockchainRecord}}<p><strong>Blockchain Record:</strong> ✅ Created</p>{{/if}}' +
+        '</div>' +
+
+        '<div style="background-color: #e3f2fd; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>🏨 {{#if (eq role "proposer")}}Your Offer{{else}}Source Booking{{/if}}</h3>' +
+        '<ul style="list-style: none; padding: 0;">' +
+        '<li><strong>📍 Location:</strong> {{sourceSwapDetails.location}}</li>' +
+        '<li><strong>📅 Dates:</strong> {{sourceSwapDetails.dates}}</li>' +
+        '<li><strong>🏠 Type:</strong> {{sourceSwapDetails.accommodationType}}</li>' +
+        '<li><strong>👥 Guests:</strong> {{sourceSwapDetails.guests}}</li>' +
+        '<li><strong>💰 Value:</strong> ${{sourceSwapDetails.value}}</li>' +
+        '</ul>' +
+        '</div>' +
+
+        '{{#if targetSwapDetails}}' +
+        '<div style="background-color: #fff3cd; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>🎯 {{#if (eq role "proposer")}}Their Booking{{else}}Target Booking{{/if}}</h3>' +
+        '<ul style="list-style: none; padding: 0;">' +
+        '<li><strong>📍 Location:</strong> {{targetSwapDetails.location}}</li>' +
+        '<li><strong>📅 Dates:</strong> {{targetSwapDetails.dates}}</li>' +
+        '<li><strong>🏠 Type:</strong> {{targetSwapDetails.accommodationType}}</li>' +
+        '<li><strong>👥 Guests:</strong> {{targetSwapDetails.guests}}</li>' +
+        '<li><strong>💰 Value:</strong> ${{targetSwapDetails.value}}</li>' +
+        '</ul>' +
+        '</div>' +
+        '{{/if}}' +
+
+        '{{#if cashOffer}}' +
+        '<div style="background-color: #e8f5e8; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>💰 Cash Payment Details</h3>' +
+        '<p><strong>Amount:</strong> {{cashOffer.amount}} {{cashOffer.currency}}</p>' +
+        '<p><strong>Status:</strong> {{#if (eq role "proposer")}}Payment Sent{{else}}Payment Received{{/if}}</p>' +
+        '</div>' +
+        '{{/if}}' +
+
+        '{{#if blockchainTransaction}}' +
+        '<div style="background-color: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>🔗 Blockchain Record</h3>' +
+        '<p><strong>Transaction ID:</strong> {{blockchainTransaction.transactionId}}</p>' +
+        '{{#if blockchainTransaction.consensusTimestamp}}<p><strong>Consensus Time:</strong> {{blockchainTransaction.consensusTimestamp}}</p>{{/if}}' +
+        '<p>Your swap completion has been permanently recorded on the blockchain for security and transparency.</p>' +
+        '</div>' +
+        '{{/if}}' +
+
+        '<div style="background-color: #d1ecf1; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>⏰ What Happens Next</h3>' +
+        '<ul>' +
+        '{{#if isBookingExchange}}' +
+        '<li>Both bookings have been updated with new ownership information</li>' +
+        '<li>You will receive separate notifications about ownership transfers</li>' +
+        '<li>Contact details will be shared for coordination</li>' +
+        '{{else}}' +
+        '<li>Your booking status has been updated to "swapped"</li>' +
+        '<li>Payment processing is complete</li>' +
+        '{{/if}}' +
+        '<li>You can view all details in your dashboard</li>' +
+        '<li>Rate your swap experience (optional)</li>' +
+        '</ul>' +
+        '</div>' +
+
+        '<div style="text-align: center; margin: 30px 0;">' +
+        '<a href="{{dashboardUrl}}" style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Complete Details</a>' +
+        '</div>' +
+
+        '<p>{{#if (eq role "proposer")}}Thank you for using our platform! We hope you enjoy your new booking arrangement.{{else}}Congratulations on completing your swap! We hope you enjoy your new arrangement.{{/if}}</p>' +
+        '<p>Best regards,<br>The Booking Swap Team</p>',
+      variables: ['recipientName', 'proposalId', 'completionType', 'isBookingExchange', 'isCashPayment', 'completionTimestamp', 'totalSwapsCompleted', 'totalBookingsUpdated', 'ownershipTransfersCount', 'hasBlockchainRecord', 'role', 'sourceSwapDetails', 'targetSwapDetails', 'cashOffer', 'blockchainTransaction', 'dashboardUrl']
+    });
+
+    this.addTemplate({
+      type: 'swap_completion_success',
+      channel: 'sms',
+      template: '🎉 Swap completed! {{#if isBookingExchange}}Booking exchange{{else}}Cash payment{{/if}} successful. {{totalSwapsCompleted}} swap(s), {{totalBookingsUpdated}} booking(s) updated. {{#if cashOffer}}{{cashOffer.amount}} {{cashOffer.currency}} {{#if (eq role "proposer")}}sent{{else}}received{{/if}}. {{/if}}Details: {{dashboardUrl}}',
+      variables: ['isBookingExchange', 'totalSwapsCompleted', 'totalBookingsUpdated', 'cashOffer', 'role', 'dashboardUrl']
+    });
+
+    this.addTemplate({
+      type: 'swap_completion_success',
+      channel: 'in_app',
+      template: '🎉 {{#if isBookingExchange}}Booking exchange{{else}}Cash payment{{/if}} completed! {{totalSwapsCompleted}} swap(s), {{totalBookingsUpdated}} booking(s) updated{{#if cashOffer}} ({{cashOffer.amount}} {{cashOffer.currency}}){{/if}}',
+      variables: ['isBookingExchange', 'totalSwapsCompleted', 'totalBookingsUpdated', 'cashOffer']
+    });
+
+    // Booking Ownership Transferred Templates
+    this.addTemplate({
+      type: 'booking_ownership_transferred',
+      channel: 'email',
+      subject: '🔄 Booking Ownership {{#if (eq role "new_owner")}}Transferred to You{{else}}Transferred{{/if}} - {{bookingDetails.title}}',
+      template: '<h2>🔄 Booking Ownership Transfer {{#if (eq role "new_owner")}}Complete - You Are Now the Owner!{{else}}Complete{{/if}}</h2>' +
+        '<p>Hello {{recipientName}},</p>' +
+        '<p>{{#if (eq role "new_owner")}}Great news! Ownership of a booking has been transferred to you as part of your successful booking exchange.{{else}}The ownership of your booking has been successfully transferred as part of your booking exchange.{{/if}}</p>' +
+
+        '<div style="background-color: {{#if (eq role "new_owner")}}#d4edda{{else}}#e3f2fd{{/if}}; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid {{#if (eq role "new_owner")}}#28a745{{else}}#2196f3{{/if}};">' +
+        '<h3>🏨 {{#if (eq role "new_owner")}}Your New{{/if}} Booking Details</h3>' +
+        '<ul style="list-style: none; padding: 0;">' +
+        '<li><strong>📋 Title:</strong> {{bookingDetails.title}}</li>' +
+        '<li><strong>📍 Location:</strong> {{bookingDetails.location}}</li>' +
+        '<li><strong>📅 Dates:</strong> {{bookingDetails.dates}}</li>' +
+        '<li><strong>🏠 Type:</strong> {{bookingDetails.accommodationType}}</li>' +
+        '<li><strong>👥 Guests:</strong> {{bookingDetails.guests}}</li>' +
+        '<li><strong>💰 Value:</strong> ${{bookingDetails.value}}</li>' +
+        '</ul>' +
+        '</div>' +
+
+        '<div style="background-color: #fff3cd; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>🤝 Exchange Partner</h3>' +
+        '<p><strong>Name:</strong> {{exchangePartnerDetails.name}}</p>' +
+        '<p><strong>Their Booking:</strong> {{exchangePartnerDetails.bookingTitle}}</p>' +
+        '<p><strong>Location:</strong> {{exchangePartnerDetails.bookingLocation}}</p>' +
+        '<p><strong>Dates:</strong> {{exchangePartnerDetails.bookingDates}}</p>' +
+        '</div>' +
+
+        '<div style="background-color: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>📋 Transfer Details</h3>' +
+        '<p><strong>Proposal ID:</strong> {{proposalId}}</p>' +
+        '<p><strong>Transfer Date:</strong> {{transferredAt}}</p>' +
+        '<p><strong>{{#if (eq role "new_owner")}}Previous Owner{{else}}New Owner{{/if}}:</strong> {{#if (eq role "new_owner")}}{{previousOwnerId}}{{else}}{{newOwnerId}}{{/if}}</p>' +
+        '</div>' +
+
+        '{{#if (eq role "new_owner")}}' +
+        '<div style="background-color: #d1ecf1; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>⏰ What You Need to Do</h3>' +
+        '<ul>' +
+        '<li>Review your new booking details in your dashboard</li>' +
+        '<li>Contact the accommodation provider if needed</li>' +
+        '<li>Coordinate with {{exchangePartnerDetails.name}} for any handover details</li>' +
+        '<li>Update your travel plans accordingly</li>' +
+        '<li>Ensure you have all necessary booking confirmations</li>' +
+        '</ul>' +
+        '</div>' +
+        '{{else}}' +
+        '<div style="background-color: #d1ecf1; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>✅ Transfer Complete</h3>' +
+        '<ul>' +
+        '<li>{{exchangePartnerDetails.name}} is now the owner of this booking</li>' +
+        '<li>You have received ownership of their booking in return</li>' +
+        '<li>All booking confirmations have been updated</li>' +
+        '<li>You can coordinate any handover details if needed</li>' +
+        '</ul>' +
+        '</div>' +
+        '{{/if}}' +
+
+        '<div style="text-align: center; margin: 30px 0;">' +
+        '<a href="{{dashboardUrl}}" style="background-color: {{#if (eq role "new_owner")}}#28a745{{else}}#007bff{{/if}}; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">{{#if (eq role "new_owner")}}View Your New Booking{{else}}View Dashboard{{/if}}</a>' +
+        '</div>' +
+
+        '<p>{{#if (eq role "new_owner")}}Congratulations on your new booking! Enjoy your upcoming trip.{{else}}Thank you for completing the exchange. We hope you enjoy your new booking arrangement.{{/if}}</p>' +
+        '<p>Best regards,<br>The Booking Swap Team</p>',
+      variables: ['recipientName', 'role', 'bookingDetails', 'exchangePartnerDetails', 'proposalId', 'transferredAt', 'previousOwnerId', 'newOwnerId', 'dashboardUrl']
+    });
+
+    this.addTemplate({
+      type: 'booking_ownership_transferred',
+      channel: 'sms',
+      template: '🔄 Booking ownership {{#if (eq role "new_owner")}}transferred to you{{else}}transferred{{/if}}: {{bookingDetails.title}} ({{bookingDetails.location}}) {{#if (eq role "new_owner")}}from{{else}}to{{/if}} {{exchangePartnerDetails.name}}. View: {{dashboardUrl}}',
+      variables: ['role', 'bookingDetails', 'exchangePartnerDetails', 'dashboardUrl']
+    });
+
+    this.addTemplate({
+      type: 'booking_ownership_transferred',
+      channel: 'in_app',
+      template: '🔄 {{#if (eq role "new_owner")}}You now own{{else}}Ownership transferred:{{/if}} {{bookingDetails.title}} {{#if (eq role "new_owner")}}(from {{exchangePartnerDetails.name}}){{else}}(to {{exchangePartnerDetails.name}}){{/if}}',
+      variables: ['role', 'bookingDetails', 'exchangePartnerDetails']
+    });
+
+    // Completion Validation Warning Templates
+    this.addTemplate({
+      type: 'completion_validation_warning',
+      channel: 'email',
+      subject: '⚠️ {{#if requiresManualReview}}Completion Validation Issues{{else}}Minor Completion Warnings{{/if}} - Proposal {{proposalId}}',
+      template: '<h2>⚠️ {{#if requiresManualReview}}Completion Validation Issues Detected{{else}}Minor Completion Validation Warnings{{/if}}</h2>' +
+        '<p>Hello {{recipientName}},</p>' +
+        '<p>{{#if requiresManualReview}}We detected some validation issues with your swap completion that require attention.{{else}}Your swap completion was successful, but we detected some minor validation warnings.{{/if}}</p>' +
+
+        '<div style="background-color: {{#if requiresManualReview}}#f8d7da{{else}}#fff3cd{{/if}}; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid {{#if requiresManualReview}}#dc3545{{else}}#ffc107{{/if}};">' +
+        '<h3>{{#if requiresManualReview}}🚨 Issues Detected{{else}}⚠️ Warnings Detected{{/if}}</h3>' +
+        '<p><strong>Proposal ID:</strong> {{proposalId}}</p>' +
+        '<p><strong>Validation Errors:</strong> {{errorCount}}</p>' +
+        '<p><strong>Validation Warnings:</strong> {{warningCount}}</p>' +
+        '<p><strong>Inconsistent Entities:</strong> {{inconsistentEntityCount}}</p>' +
+        '{{#if requiresManualReview}}<p><strong>Status:</strong> Requires Manual Review</p>{{else}}<p><strong>Status:</strong> Completed with Warnings</p>{{/if}}' +
+        '</div>' +
+
+        '{{#if validationErrors}}' +
+        '<div style="background-color: #f8d7da; padding: 15px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>❌ Validation Errors</h3>' +
+        '<ul>' +
+        '{{#each validationErrors}}<li>{{this}}</li>{{/each}}' +
+        '</ul>' +
+        '</div>' +
+        '{{/if}}' +
+
+        '{{#if validationWarnings}}' +
+        '<div style="background-color: #fff3cd; padding: 15px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>⚠️ Validation Warnings</h3>' +
+        '<ul>' +
+        '{{#each validationWarnings}}<li>{{this}}</li>{{/each}}' +
+        '</ul>' +
+        '</div>' +
+        '{{/if}}' +
+
+        '{{#if correctionAttempts}}' +
+        '<div style="background-color: #e3f2fd; padding: 15px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>🔧 Automatic Correction Attempts</h3>' +
+        '<p><strong>Total Attempts:</strong> {{correctionAttemptCount}}</p>' +
+        '<p><strong>Successful Corrections:</strong> {{successfulCorrections}}</p>' +
+        '<ul>' +
+        '{{#each correctionAttempts}}' +
+        '<li>{{entityType}} {{entityId}}: {{#if correctionApplied}}✅ Fixed{{else}}❌ Failed{{#if correctionError}} - {{correctionError}}{{/if}}{{/if}}</li>' +
+        '{{/each}}' +
+        '</ul>' +
+        '</div>' +
+        '{{/if}}' +
+
+        '{{#if requiresManualReview}}' +
+        '<div style="background-color: #d1ecf1; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>🛠️ Next Steps Required</h3>' +
+        '<ul>' +
+        '<li>Our support team has been notified of these issues</li>' +
+        '<li>We will review and resolve the validation problems</li>' +
+        '<li>You will be contacted if any action is needed from your side</li>' +
+        '<li>Your swap completion status will be updated once resolved</li>' +
+        '</ul>' +
+        '</div>' +
+        '{{else}}' +
+        '<div style="background-color: #d4edda; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>✅ Completion Status</h3>' +
+        '<p>Despite the warnings, your swap completion was successful. The warnings are minor and do not affect the validity of your swap.</p>' +
+        '</div>' +
+        '{{/if}}' +
+
+        '<div style="text-align: center; margin: 30px 0;">' +
+        '<a href="{{dashboardUrl}}" style="background-color: {{#if requiresManualReview}}#dc3545{{else}}#ffc107{{/if}}; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Details</a>' +
+        '{{#if requiresManualReview}}' +
+        '<a href="/support" style="background-color: #6c757d; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-left: 10px;">Contact Support</a>' +
+        '{{/if}}' +
+        '</div>' +
+
+        '<p>{{#if requiresManualReview}}We apologize for any inconvenience and will resolve these issues promptly.{{else}}Thank you for your patience. Your swap is complete and valid.{{/if}}</p>' +
+        '<p>Best regards,<br>The Booking Swap Team</p>',
+      variables: ['recipientName', 'proposalId', 'requiresManualReview', 'errorCount', 'warningCount', 'inconsistentEntityCount', 'validationErrors', 'validationWarnings', 'correctionAttempts', 'correctionAttemptCount', 'successfulCorrections', 'dashboardUrl']
+    });
+
+    this.addTemplate({
+      type: 'completion_validation_warning',
+      channel: 'sms',
+      template: '⚠️ {{#if requiresManualReview}}Completion issues detected{{else}}Minor completion warnings{{/if}} for proposal {{proposalId}}. {{errorCount}} error(s), {{warningCount}} warning(s). {{#if requiresManualReview}}Support will contact you.{{else}}Swap completed successfully.{{/if}} Details: {{dashboardUrl}}',
+      variables: ['requiresManualReview', 'proposalId', 'errorCount', 'warningCount', 'dashboardUrl']
+    });
+
+    this.addTemplate({
+      type: 'completion_validation_warning',
+      channel: 'in_app',
+      template: '⚠️ {{#if requiresManualReview}}Completion validation issues{{else}}Minor completion warnings{{/if}}: {{errorCount}} error(s), {{warningCount}} warning(s){{#if requiresManualReview}} - manual review required{{/if}}',
+      variables: ['requiresManualReview', 'errorCount', 'warningCount']
+    });
+
+    // Swap Completion Failed Templates
+    this.addTemplate({
+      type: 'swap_completion_failed',
+      channel: 'email',
+      subject: '❌ Swap Completion Failed - Proposal {{proposalId}}',
+      template: '<h2>❌ Swap Completion Failed</h2>' +
+        '<p>Hello {{recipientName}},</p>' +
+        '<p>We encountered an issue while processing your swap completion. {{#if rollbackSuccessful}}All changes have been safely rolled back.{{else}}Some changes may require manual intervention.{{/if}}</p>' +
+
+        '<div style="background-color: #f8d7da; padding: 20px; margin: 20px 0; border-radius: 8px; border-left: 4px solid #dc3545;">' +
+        '<h3>❌ Failure Details</h3>' +
+        '<p><strong>Proposal ID:</strong> {{proposalId}}</p>' +
+        '<p><strong>Error Message:</strong> {{errorMessage}}</p>' +
+        '{{#if errorCode}}<p><strong>Error Code:</strong> {{errorCode}}</p>{{/if}}' +
+        '<p><strong>Rollback Status:</strong> {{#if rollbackSuccessful}}✅ Successful{{else}}❌ Failed{{/if}}</p>' +
+        '{{#if affectedEntities}}<p><strong>Affected Entities:</strong> {{affectedEntityCount}}</p>{{/if}}' +
+        '</div>' +
+
+        '{{#if affectedEntities}}' +
+        '<div style="background-color: #fff3cd; padding: 15px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>📋 Affected Components</h3>' +
+        '<ul>' +
+        '{{#each affectedEntities}}<li>{{this}}</li>{{/each}}' +
+        '</ul>' +
+        '</div>' +
+        '{{/if}}' +
+
+        '{{#if rollbackSuccessful}}' +
+        '<div style="background-color: #d4edda; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>✅ System Recovery</h3>' +
+        '<p>All changes have been successfully rolled back. Your bookings and swaps are in their original state before the completion attempt.</p>' +
+        '<ul>' +
+        '<li>No data has been lost or corrupted</li>' +
+        '<li>Your proposal remains in its previous state</li>' +
+        '<li>You can retry the completion process</li>' +
+        '<li>All related entities have been restored</li>' +
+        '</ul>' +
+        '</div>' +
+        '{{else}}' +
+        '<div style="background-color: #f8d7da; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>🚨 Manual Intervention Required</h3>' +
+        '<p>The rollback process was unsuccessful. Our support team has been automatically notified and will resolve this issue promptly.</p>' +
+        '<ul>' +
+        '<li>Do not attempt to retry the completion</li>' +
+        '<li>Our team will contact you within 24 hours</li>' +
+        '<li>Your data integrity is our top priority</li>' +
+        '<li>We will provide updates on the resolution progress</li>' +
+        '</ul>' +
+        '</div>' +
+        '{{/if}}' +
+
+        '<div style="background-color: #e3f2fd; padding: 20px; margin: 20px 0; border-radius: 8px;">' +
+        '<h3>⏰ What Happens Next</h3>' +
+        '<ul>' +
+        '{{#if rollbackSuccessful}}' +
+        '<li>You can review the error details and try again</li>' +
+        '<li>Check if any information needs to be updated</li>' +
+        '<li>Contact support if the issue persists</li>' +
+        '{{else}}' +
+        '<li>Our support team will investigate the issue</li>' +
+        '<li>We will contact you with updates and next steps</li>' +
+        '<li>Do not make any changes to related bookings</li>' +
+        '{{/if}}' +
+        '<li>Monitor your dashboard for status updates</li>' +
+        '</ul>' +
+        '</div>' +
+
+        '<div style="text-align: center; margin: 30px 0;">' +
+        '<a href="{{dashboardUrl}}" style="background-color: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold;">View Dashboard</a>' +
+        '{{#if rollbackSuccessful}}' +
+        '<a href="{{dashboardUrl}}" style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-left: 10px;">Retry Completion</a>' +
+        '{{/if}}' +
+        '{{#if requiresManualIntervention}}' +
+        '<a href="/support" style="background-color: #dc3545; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-left: 10px;">Contact Support</a>' +
+        '{{/if}}' +
+        '</div>' +
+
+        '<p>{{#if rollbackSuccessful}}We apologize for the inconvenience. Please try again or contact support if you continue to experience issues.{{else}}We sincerely apologize for this issue and are working to resolve it as quickly as possible.{{/if}}</p>' +
+        '<p>Best regards,<br>The Booking Swap Team</p>',
+      variables: ['recipientName', 'proposalId', 'errorMessage', 'errorCode', 'rollbackSuccessful', 'requiresManualIntervention', 'affectedEntities', 'affectedEntityCount', 'dashboardUrl']
+    });
+
+    this.addTemplate({
+      type: 'swap_completion_failed',
+      channel: 'sms',
+      template: '❌ Swap completion failed for proposal {{proposalId}}. {{#if rollbackSuccessful}}Changes rolled back successfully. You can retry.{{else}}Manual intervention required. Support will contact you.{{/if}} Error: {{errorMessage}}. Dashboard: {{dashboardUrl}}',
+      variables: ['proposalId', 'rollbackSuccessful', 'errorMessage', 'dashboardUrl']
+    });
+
+    this.addTemplate({
+      type: 'swap_completion_failed',
+      channel: 'in_app',
+      template: '❌ Completion failed: {{errorMessage}}{{#if rollbackSuccessful}} - changes rolled back, you can retry{{else}} - support will contact you{{/if}}',
+      variables: ['errorMessage', 'rollbackSuccessful']
+    });
   }
 
   private addTemplate(template: NotificationTemplate): void {

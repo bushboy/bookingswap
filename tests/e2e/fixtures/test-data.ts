@@ -1,9 +1,10 @@
 // Test data for E2E tests
+import { WALLET_CONFIG, createMockTransactionId } from '../../fixtures/wallet-config';
 
 export const testUsers = {
   alice: {
     id: 'user-alice-123',
-    walletAddress: '0.0.123456',
+    walletAddress: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT,
     profile: {
       displayName: 'Alice Johnson',
       email: 'alice@example.com',
@@ -26,7 +27,7 @@ export const testUsers = {
   },
   bob: {
     id: 'user-bob-456',
-    walletAddress: '0.0.789012',
+    walletAddress: WALLET_CONFIG.SECONDARY_TESTNET_ACCOUNT,
     profile: {
       displayName: 'Bob Smith',
       email: 'bob@example.com',
@@ -146,7 +147,7 @@ export const testSwap = {
 
 export const mockHederaResponses = {
   submitTransaction: {
-    transactionId: '0.0.123456@1704067200.123456789',
+    transactionId: createMockTransactionId(1704067200),
     consensusTimestamp: '1704067200.123456789',
     receipt: {
       status: 'SUCCESS',
@@ -154,7 +155,7 @@ export const mockHederaResponses = {
     },
   },
   queryTransaction: {
-    transactionId: '0.0.123456@1704067200.123456789',
+    transactionId: createMockTransactionId(1704067200),
     consensusTimestamp: '1704067200.123456789',
     receipt: {
       status: 'SUCCESS',

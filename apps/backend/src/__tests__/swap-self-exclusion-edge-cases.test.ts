@@ -7,6 +7,7 @@ import {
     CreateEnhancedProposalRequest
 } from '@booking-swap/shared';
 import { logger } from '../utils/logger';
+import { WALLET_CONFIG } from '../../../../tests/fixtures/wallet-config';
 
 /**
  * Test suite for swap self-exclusion edge cases and error scenarios
@@ -32,7 +33,7 @@ describe('Swap Self-Exclusion Edge Cases and Error Scenarios', () => {
         // Set test environment variables
         process.env.NODE_ENV = 'test';
         process.env.JWT_SECRET = 'test-secret-key';
-        process.env.HEDERA_ACCOUNT_ID = '0.0.123456';
+        process.env.HEDERA_ACCOUNT_ID = WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT;
         process.env.HEDERA_PRIVATE_KEY = '302e020100300506032b657004220420abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
         process.env.HEDERA_NETWORK = 'testnet';
 

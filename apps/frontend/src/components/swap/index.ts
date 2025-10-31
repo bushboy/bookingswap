@@ -35,3 +35,7 @@ export { ProposalAcceptanceModal } from './ProposalAcceptanceModal';
 export { ProposalStatusIndicator } from './ProposalStatusIndicator';
 export { ProposalDetailsView } from './ProposalDetailsView';
 export { ProposalDetailsViewExample } from './ProposalDetailsViewExample';
+
+// Completion status components
+export { CompletionStatusIndicator } from './CompletionStatusIndicator';
+export { CompletionDetailsModal } from './CompletionDetailsModal';

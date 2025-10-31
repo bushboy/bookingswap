@@ -55,7 +55,7 @@ export const selectHasAvailableProviders = createSelector(
 export const selectIsProviderAvailable = createSelector(
   [
     selectAvailableProviders,
-    (state: RootState, providerId: string) => providerId,
+    (_: RootState, providerId: string) => providerId,
   ],
   (providers, providerId) => providers.includes(providerId)
 );
@@ -128,10 +128,7 @@ export const selectTruncatedWalletAddress = createSelector(
   }
 );
 
-export const selectCanConnect = createSelector(
-  [selectConnectionStatus, selectHasAvailableProviders],
-  (status, hasProviders) => status === 'idle' && hasProviders
-);
+// Removed - replaced by selectCanConnectWallet with enhanced validation
 
 export const selectCanDisconnect = createSelector(
   [selectIsWalletConnected],
@@ -245,6 +242,238 @@ export const selectWalletUIState = createSelector(
   })
 );
 
+// New selectors for serializable state management
+export const selectIsWalletInitialized = createSelector(
+  [selectWalletState],
+  walletState => walletState.isInitialized
+);
+
+export const selectLastStateUpdate = createSelector(
+  [selectWalletState],
+  walletState => walletState.lastStateUpdate
+);
+
+export const selectWalletErrorTimestamp = createSelector(
+  [selectWalletError],
+  error => error?.timestamp || null
+);
+
+export const selectAccountLastUpdated = createSelector(
+  [selectAccountInfo],
+  accountInfo => accountInfo?.lastUpdated || null
+);
+
+// Enhanced connection validation selector with comprehensive validation logic
+export const selectCanConnectWallet = createSelector(
+  [
+    selectConnectionStatus,
+    selectHasAvailableProviders,
+    selectIsWalletInitialized,
+    selectHasWalletError,
+    selectWalletErrorType,
+  ],
+  (status, hasProviders, isInitialized, hasError, errorType) => {
+    // Basic requirements
+    if (status !== 'idle' || !hasProviders || !isInitialized) {
+      return false;
+    }
+
+    // Check for blocking errors
+    if (hasError && errorType) {
+      const blockingErrorTypes = [
+        WalletErrorType.PROVIDER_NOT_FOUND,
+        WalletErrorType.CONNECTION_REJECTED,
+        WalletErrorType.WALLET_LOCKED,
+      ];
+
+      if (blockingErrorTypes.includes(errorType)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+);
+
+// Update the original selectCanConnect to use enhanced validation
+export const selectCanConnect = selectCanConnectWallet;
+
+// Connection validation selectors
+export const selectConnectionBlockers = createSelector(
+  [
+    selectConnectionStatus,
+    selectHasAvailableProviders,
+    selectIsWalletInitialized,
+    selectHasWalletError,
+    selectWalletErrorType,
+  ],
+  (status, hasProviders, isInitialized, hasError, errorType) => {
+    const blockers: string[] = [];
+
+    if (status !== 'idle') {
+      if (status === 'connecting') {
+        blockers.push('Connection already in progress');
+      } else if (status === 'connected') {
+        blockers.push('Wallet already connected');
+      } else if (status === 'error') {
+        blockers.push('Connection error state');
+      }
+    }
+
+    if (!hasProviders) {
+      blockers.push('No wallet providers available');
+    }
+
+    if (!isInitialized) {
+      blockers.push('Wallet service not initialized');
+    }
+
+    if (hasError && errorType) {
+      const blockingErrorTypes = [
+        WalletErrorType.PROVIDER_NOT_FOUND,
+        WalletErrorType.CONNECTION_REJECTED,
+        WalletErrorType.WALLET_LOCKED,
+      ];
+
+      if (blockingErrorTypes.includes(errorType)) {
+        blockers.push(`Blocking error: ${errorType}`);
+      }
+    }
+
+    return blockers;
+  }
+);
+
+export const selectConnectionValidationState = createSelector(
+  [
+    selectCanConnectWallet,
+    selectConnectionBlockers,
+    selectConnectionStatus,
+    selectIsWalletInitialized,
+    selectHasAvailableProviders,
+    selectWalletError,
+  ],
+  (canConnect, blockers, status, isInitialized, hasProviders, error) => ({
+    canConnect,
+    blockers,
+    isValid: canConnect,
+    details: {
+      walletServiceInitialized: isInitialized,
+      hasActiveConnection: status === 'connected',
+      providersAvailable: hasProviders,
+      hasBlockingErrors: error !== null,
+      connectionStatus: status,
+    },
+    warnings: [] as string[], // Can be populated with non-blocking warnings
+  })
+);
+
+export const selectHasConnectionBlockers = createSelector(
+  [selectConnectionBlockers],
+  blockers => blockers.length > 0
+);
+
+export const selectConnectionValidationDetails = createSelector(
+  [
+    selectIsWalletInitialized,
+    selectConnectionStatus,
+    selectHasAvailableProviders,
+    selectHasWalletError,
+    selectWalletErrorType,
+    selectCurrentProvider,
+  ],
+  (isInitialized, status, hasProviders, hasError, errorType, currentProvider) => ({
+    walletServiceInitialized: isInitialized,
+    hasActiveConnection: status === 'connected',
+    providersAvailable: hasProviders,
+    hasBlockingErrors: hasError && errorType ? [
+      WalletErrorType.PROVIDER_NOT_FOUND,
+      WalletErrorType.CONNECTION_REJECTED,
+      WalletErrorType.WALLET_LOCKED,
+    ].includes(errorType) : false,
+    reduxStateConsistent: true, // Assume consistent within Redux
+    currentConnectionStatus: status,
+    currentProvider,
+    lastError: errorType,
+  })
+);
+
+// Edge case handling selectors
+export const selectConnectionEdgeCases = createSelector(
+  [
+    selectConnectionStatus,
+    selectIsWalletConnected,
+    selectCurrentProvider,
+    selectAccountInfo,
+  ],
+  (status, isConnected, currentProvider, accountInfo) => {
+    const edgeCases: string[] = [];
+
+    // Check for state inconsistencies
+    if (status === 'connected' && !isConnected) {
+      edgeCases.push('Status connected but isConnected false');
+    }
+
+    if (isConnected && status !== 'connected') {
+      edgeCases.push('IsConnected true but status not connected');
+    }
+
+    if (isConnected && !currentProvider) {
+      edgeCases.push('Connected but no current provider');
+    }
+
+    if (currentProvider && !isConnected) {
+      edgeCases.push('Has current provider but not connected');
+    }
+
+    if (isConnected && !accountInfo) {
+      edgeCases.push('Connected but no account info');
+    }
+
+    return {
+      hasEdgeCases: edgeCases.length > 0,
+      edgeCases,
+      isStateConsistent: edgeCases.length === 0,
+    };
+  }
+);
+
+// Provider-specific validation selectors
+export const selectProviderValidationState = createSelector(
+  [
+    selectAvailableProviders,
+    selectCurrentProvider,
+    (_: RootState, providerId?: string) => providerId,
+  ],
+  (availableProviders, currentProvider, targetProviderId) => {
+    if (!targetProviderId) {
+      return {
+        isValid: false,
+        blockers: ['No provider specified'],
+        isAvailable: false,
+        isRegistered: false,
+        isCurrent: false,
+      };
+    }
+
+    const isAvailable = availableProviders.includes(targetProviderId);
+    const isCurrent = currentProvider === targetProviderId;
+    const blockers: string[] = [];
+
+    if (!isAvailable) {
+      blockers.push(`Provider ${targetProviderId} is not available`);
+    }
+
+    return {
+      isValid: isAvailable,
+      blockers,
+      isAvailable,
+      isRegistered: isAvailable, // Assume registered if available
+      isCurrent,
+    };
+  }
+);
+
 // Statistics selectors
 export const selectWalletStatistics = createSelector(
   [selectWalletState],
@@ -254,5 +483,7 @@ export const selectWalletStatistics = createSelector(
     currentProvider: walletState.currentProvider,
     hasStoredPreferences: walletState.preferences.lastUsedProvider !== null,
     autoConnectEnabled: walletState.preferences.autoConnect,
+    isInitialized: walletState.isInitialized,
+    lastStateUpdate: walletState.lastStateUpdate,
   })
 );

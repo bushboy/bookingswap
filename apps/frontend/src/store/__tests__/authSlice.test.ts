@@ -13,6 +13,12 @@ describe('authSlice', () => {
     walletConnected: false,
     loading: false,
     error: null,
+    syncStatus: {
+      lastSyncTime: null,
+      syncSource: null,
+      hasSyncError: false,
+      syncErrorMessage: null,
+    },
   };
 
   it('should return the initial state', () => {

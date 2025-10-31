@@ -50,7 +50,7 @@ async function apiCall<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   const url = `${baseUrl}${endpoint}`;
 
   // Add default headers
@@ -244,9 +244,9 @@ export function getRetryDelay(error: AuthError, attemptNumber: number = 1): numb
  */
 export function formatErrorForUser(error: AuthError): string {
   // For security-sensitive errors, always show the secure message
-  if (error.code?.includes('EMAIL_NOT_FOUND') || 
-      error.code?.includes('USER_NOT_FOUND') ||
-      error.code?.includes('WALLET_ONLY_USER')) {
+  if (error.code?.includes('EMAIL_NOT_FOUND') ||
+    error.code?.includes('USER_NOT_FOUND') ||
+    error.code?.includes('WALLET_ONLY_USER')) {
     return 'If an account with that email exists, a password reset link has been sent.';
   }
 

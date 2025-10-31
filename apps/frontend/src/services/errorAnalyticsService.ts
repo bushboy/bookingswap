@@ -500,7 +500,7 @@ export class ErrorAnalyticsService {
         console.warn(`[Error Analytics Alert] ${type.toUpperCase()}: ${message}`);
 
         // In production, this would integrate with alerting systems
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.DEV) {
             // Show desktop notification in development
             if ('Notification' in window && Notification.permission === 'granted') {
                 new Notification('Error Analytics Alert', {

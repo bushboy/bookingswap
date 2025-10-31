@@ -205,4 +205,3 @@ export const MinimalTextConnectionStatus: React.FC<{
 };
 
 export default TextConnectionStatus;
-</content >

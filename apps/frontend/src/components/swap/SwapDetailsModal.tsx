@@ -9,6 +9,9 @@ import { swapService } from '@/services/swapService';
 import { FinancialDataHandler } from '@/utils/financialDataHandler';
 import { proposalService } from '@/services/proposalService';
 import { ProposalDetailsModal } from './ProposalDetailsModal';
+import { CompletionStatusIndicator } from './CompletionStatusIndicator';
+import { CompletionDetailsModal } from './CompletionDetailsModal';
+import { CompletionAPI, CompletionStatus } from '@/services/completionAPI';
 
 interface SwapDetailsModalProps {
     isOpen: boolean;
@@ -123,6 +126,12 @@ export const SwapDetailsModal: React.FC<SwapDetailsModalProps> = ({
     const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    // Completion-related state
+    const [completionStatus, setCompletionStatus] = useState<CompletionStatus | null>(null);
+    const [isLoadingCompletion, setIsLoadingCompletion] = useState(false);
+    const [showCompletionDetails, setShowCompletionDetails] = useState(false);
+    const [completionError, setCompletionError] = useState<string | null>(null);
+
     // Fetch enhanced swap details when modal opens
     useEffect(() => {
         const fetchEnhancedDetails = async () => {
@@ -186,6 +195,28 @@ export const SwapDetailsModal: React.FC<SwapDetailsModalProps> = ({
 
         fetchDetailedProposals();
     }, [isOpen, userSwap.id, swapData.proposalCount, swapData.proposalsFromOthers]);
+
+    // Fetch completion status
+    useEffect(() => {
+        const fetchCompletionStatus = async () => {
+            if (!isOpen || !userSwap.id) return;
+
+            setIsLoadingCompletion(true);
+            setCompletionError(null);
+
+            try {
+                const completion = await CompletionAPI.getSwapCompletionStatus(userSwap.id);
+                setCompletionStatus(completion);
+            } catch (error) {
+                console.error('Failed to fetch completion status:', error);
+                setCompletionError('Failed to load completion information');
+            } finally {
+                setIsLoadingCompletion(false);
+            }
+        };
+
+        fetchCompletionStatus();
+    }, [isOpen, userSwap.id]);
 
     const handleProposalAction = (proposalId: string, action: 'accept' | 'reject') => {
         setSelectedProposalId(null);
@@ -517,6 +548,203 @@ export const SwapDetailsModal: React.FC<SwapDetailsModalProps> = ({
                             </CardContent>
                         </Card>
                     </section>
+
+                    {/* Completion Status Section */}
+                    {(completionStatus || isLoadingCompletion || completionError) && (
+                        <section>
+                            <h3
+                                style={{
+                                    fontSize: tokens.typography.fontSize.lg,
+                                    fontWeight: tokens.typography.fontWeight.semibold,
+                                    color: tokens.colors.neutral[900],
+                                    marginBottom: tokens.spacing[4],
+                                    paddingBottom: tokens.spacing[2],
+                                    borderBottom: `2px solid ${tokens.colors.primary[500]}`,
+                                }}
+                            >
+                                Completion Status
+                            </h3>
+
+                            {isLoadingCompletion && (
+                                <div
+                                    style={{
+                                        textAlign: 'center',
+                                        padding: tokens.spacing[6],
+                                        color: tokens.colors.neutral[600],
+                                    }}
+                                >
+                                    <div style={{ fontSize: '24px', marginBottom: tokens.spacing[2] }}>⏳</div>
+                                    Loading completion information...
+                                </div>
+                            )}
+
+                            {completionError && (
+                                <div
+                                    style={{
+                                        padding: tokens.spacing[4],
+                                        backgroundColor: tokens.colors.warning[50],
+                                        borderRadius: tokens.borderRadius.md,
+                                        border: `1px solid ${tokens.colors.warning[200]}`,
+                                        color: tokens.colors.warning[700],
+                                    }}
+                                >
+                                    <strong>⚠️ Warning:</strong> {completionError}
+                                </div>
+                            )}
+
+                            {completionStatus && (
+                                <div>
+                                    <CompletionStatusIndicator
+                                        completion={completionStatus}
+                                        onViewDetails={() => setShowCompletionDetails(true)}
+                                        showTimeline={true}
+                                    />
+
+                                    {/* Related Entity Information */}
+                                    {(completionStatus.completedSwaps.length > 1 || completionStatus.updatedBookings.length > 0) && (
+                                        <div
+                                            style={{
+                                                marginTop: tokens.spacing[4],
+                                                padding: tokens.spacing[4],
+                                                backgroundColor: tokens.colors.neutral[50],
+                                                borderRadius: tokens.borderRadius.md,
+                                                border: `1px solid ${tokens.colors.neutral[200]}`,
+                                            }}
+                                        >
+                                            <h4
+                                                style={{
+                                                    fontSize: tokens.typography.fontSize.base,
+                                                    fontWeight: tokens.typography.fontWeight.semibold,
+                                                    color: tokens.colors.neutral[900],
+                                                    marginBottom: tokens.spacing[3],
+                                                }}
+                                            >
+                                                Related Entities Updated
+                                            </h4>
+
+                                            {completionStatus.completedSwaps.length > 1 && (
+                                                <div style={{ marginBottom: tokens.spacing[3] }}>
+                                                    <div
+                                                        style={{
+                                                            fontSize: tokens.typography.fontSize.sm,
+                                                            color: tokens.colors.neutral[700],
+                                                            marginBottom: tokens.spacing[2],
+                                                        }}
+                                                    >
+                                                        Other Completed Swaps ({completionStatus.completedSwaps.length - 1})
+                                                    </div>
+                                                    {completionStatus.completedSwaps
+                                                        .filter(swap => swap.swapId !== userSwap.id)
+                                                        .map((swap) => (
+                                                            <div
+                                                                key={swap.swapId}
+                                                                style={{
+                                                                    fontSize: tokens.typography.fontSize.sm,
+                                                                    color: tokens.colors.neutral[600],
+                                                                    fontFamily: 'monospace',
+                                                                    marginBottom: tokens.spacing[1],
+                                                                }}
+                                                            >
+                                                                {swap.swapId.slice(0, 8)}...{swap.swapId.slice(-8)}
+                                                                ({swap.previousStatus} → {swap.newStatus})
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            )}
+
+                                            {completionStatus.updatedBookings.length > 0 && (
+                                                <div>
+                                                    <div
+                                                        style={{
+                                                            fontSize: tokens.typography.fontSize.sm,
+                                                            color: tokens.colors.neutral[700],
+                                                            marginBottom: tokens.spacing[2],
+                                                        }}
+                                                    >
+                                                        Updated Bookings ({completionStatus.updatedBookings.length})
+                                                    </div>
+                                                    {completionStatus.updatedBookings.map((booking) => (
+                                                        <div
+                                                            key={booking.bookingId}
+                                                            style={{
+                                                                fontSize: tokens.typography.fontSize.sm,
+                                                                color: tokens.colors.neutral[600],
+                                                                fontFamily: 'monospace',
+                                                                marginBottom: tokens.spacing[1],
+                                                            }}
+                                                        >
+                                                            {booking.bookingId.slice(0, 8)}...{booking.bookingId.slice(-8)}
+                                                            ({booking.previousStatus} → {booking.newStatus})
+                                                            {booking.newOwnerId && ' - Ownership Transferred'}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Validation Warnings */}
+                                    {completionStatus.validationWarnings && completionStatus.validationWarnings.length > 0 && (
+                                        <div
+                                            style={{
+                                                marginTop: tokens.spacing[4],
+                                                padding: tokens.spacing[3],
+                                                backgroundColor: tokens.colors.warning[50],
+                                                border: `1px solid ${tokens.colors.warning[200]}`,
+                                                borderRadius: tokens.borderRadius.md,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    fontSize: tokens.typography.fontSize.sm,
+                                                    fontWeight: tokens.typography.fontWeight.medium,
+                                                    color: tokens.colors.warning[700],
+                                                    marginBottom: tokens.spacing[2],
+                                                }}
+                                            >
+                                                ⚠️ Completion Warnings
+                                            </div>
+                                            <ul
+                                                style={{
+                                                    margin: 0,
+                                                    paddingLeft: tokens.spacing[4],
+                                                    fontSize: tokens.typography.fontSize.sm,
+                                                    color: tokens.colors.warning[700],
+                                                }}
+                                            >
+                                                {completionStatus.validationWarnings.map((warning, index) => (
+                                                    <li key={index} style={{ marginBottom: tokens.spacing[1] }}>
+                                                        {warning}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {!completionStatus && !isLoadingCompletion && !completionError && (
+                                <div
+                                    style={{
+                                        textAlign: 'center',
+                                        padding: tokens.spacing[6],
+                                        color: tokens.colors.neutral[500],
+                                    }}
+                                >
+                                    <div style={{ fontSize: '32px', marginBottom: tokens.spacing[2] }}>📋</div>
+                                    No completion information available
+                                    <div
+                                        style={{
+                                            fontSize: tokens.typography.fontSize.sm,
+                                            marginTop: tokens.spacing[2],
+                                        }}
+                                    >
+                                        This swap has not been completed yet
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    )}
 
                     {/* Payment Types */}
                     {paymentTypes && (
@@ -1040,6 +1268,31 @@ export const SwapDetailsModal: React.FC<SwapDetailsModalProps> = ({
                     onClose={() => setSelectedProposalId(null)}
                     onAccept={(proposalId) => handleProposalAction(proposalId, 'accept')}
                     onReject={(proposalId) => handleProposalAction(proposalId, 'reject')}
+                />
+            )}
+
+            {/* Completion Details Modal */}
+            {showCompletionDetails && completionStatus && (
+                <CompletionDetailsModal
+                    isOpen={showCompletionDetails}
+                    onClose={() => setShowCompletionDetails(false)}
+                    completion={{
+                        id: completionStatus.id,
+                        proposalId: '', // Will be fetched from audit
+                        completionType: completionStatus.completionType,
+                        initiatedBy: '', // Will be fetched from audit
+                        completedAt: completionStatus.completedAt || new Date(),
+                        affectedSwaps: completionStatus.completedSwaps.map(s => s.swapId),
+                        affectedBookings: completionStatus.updatedBookings.map(b => b.bookingId),
+                        databaseTransactionId: '', // Will be fetched from audit
+                        blockchainTransactionId: completionStatus.blockchainTransactionId,
+                        status: completionStatus.status,
+                        errorDetails: completionStatus.errorDetails,
+                        preValidationResult: undefined,
+                        postValidationResult: undefined,
+                        createdAt: completionStatus.initiatedAt,
+                        updatedAt: completionStatus.completedAt || completionStatus.initiatedAt,
+                    }}
                 />
             )}
         </>

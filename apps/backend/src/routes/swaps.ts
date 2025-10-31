@@ -1,10 +1,13 @@
 import { Router } from 'express';
 import { SwapController } from '../controllers/SwapController';
+import { CompletionController } from '../controllers/CompletionController';
 import { AuthMiddleware } from '../middleware/auth';
+import { validateSwapId } from '../middleware/completionValidation';
 
 export function createSwapRoutes(
   swapController: SwapController,
-  authMiddleware: AuthMiddleware
+  authMiddleware: AuthMiddleware,
+  completionController?: CompletionController
 ): Router {
   const router = Router();
 
@@ -57,6 +60,14 @@ export function createSwapRoutes(
 
   // Swap status and history
   router.get('/:id/status', swapController.getSwapStatus);
+
+  // Swap completion status endpoint (if completion controller is available)
+  if (completionController) {
+    router.get('/:swapId/completion-status',
+      validateSwapId,
+      completionController.getSwapCompletionStatus
+    );
+  }
 
   // Booking-specific proposals
   router.get('/booking/:bookingId/proposals', swapController.getBookingProposals);

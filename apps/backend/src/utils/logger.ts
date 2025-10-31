@@ -11,7 +11,7 @@ const structuredFormat = winston.format.combine(
   winston.format.json(),
   winston.format.printf((info) => {
     const { timestamp, level, message, service, ...meta } = info;
-    
+
     const logEntry = {
       timestamp,
       level,
@@ -39,7 +39,7 @@ const consoleFormat = winston.format.combine(
 // Create logger instance
 export const logger = winston.createLogger({
   level: logLevel,
-  defaultMeta: { 
+  defaultMeta: {
     service: 'booking-swap-backend',
     version: process.env.npm_package_version || '1.0.0',
   },
@@ -52,14 +52,14 @@ if (nodeEnv === 'production') {
   logger.add(new winston.transports.Console({
     format: structuredFormat,
   }));
-  
+
   // Add file transport for production (only if logs directory exists)
   try {
     const fs = require('fs');
     if (!fs.existsSync('logs')) {
       fs.mkdirSync('logs', { recursive: true });
     }
-    
+
     logger.add(new winston.transports.File({
       filename: 'logs/error.log',
       level: 'error',
@@ -67,7 +67,7 @@ if (nodeEnv === 'production') {
       maxsize: 5242880, // 5MB
       maxFiles: 5,
     }));
-    
+
     logger.add(new winston.transports.File({
       filename: 'logs/combined.log',
       format: structuredFormat,
@@ -76,7 +76,7 @@ if (nodeEnv === 'production') {
     }));
   } catch (error) {
     // Fallback to console only if file logging fails
-    console.warn('Failed to setup file logging:', error.message);
+    console.warn('Failed to setup file logging:', error instanceof Error ? error.message : String(error));
   }
 } else {
   // Development: human-readable console logging

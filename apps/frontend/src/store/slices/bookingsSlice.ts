@@ -1,29 +1,43 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { 
-  Booking, 
-  BookingStatus, 
+import {
+  BookingStatus,
   BookingType,
   BookingWithSwapInfo,
   EnhancedBookingFilters,
   SwapInfo,
-  UnifiedBookingData
 } from '@booking-swap/shared';
 import {
-  BookingFilters,
   BookingSearchResult,
 } from '../../services/bookingService';
 
+// Completion-related interfaces for bookings
+export interface BookingSwapCompletion {
+  swappedAt?: Date;
+  swapTransactionId?: string;
+  originalOwnerId?: string; // For tracking ownership transfers
+  swapCompletionId?: string;
+  relatedBookingSwaps?: string[]; // IDs of other bookings swapped in same transaction
+  completionType?: 'booking_exchange' | 'cash_payment';
+  proposalId?: string; // The proposal that triggered this completion
+  newOwnerId?: string; // For ownership transfers
+}
+
+// Enhanced booking interface with completion tracking
+interface EnhancedBookingWithSwapInfo extends BookingWithSwapInfo {
+  swapCompletion?: BookingSwapCompletion;
+}
+
 interface BookingsState {
   // Core data with swap information (for backward compatibility)
-  bookings: BookingWithSwapInfo[];
-  currentBooking: BookingWithSwapInfo | null;
+  bookings: EnhancedBookingWithSwapInfo[];
+  currentBooking: EnhancedBookingWithSwapInfo | null;
   searchResults: BookingSearchResult | null;
-  availableBookings: BookingWithSwapInfo[];
+  availableBookings: EnhancedBookingWithSwapInfo[];
 
   // Enhanced booking data with swap integration (deprecated - use bookingEdit and swapSpecification slices)
-  bookingsWithSwapInfo: BookingWithSwapInfo[];
-  swappableBookings: BookingWithSwapInfo[];
-  
+  bookingsWithSwapInfo: EnhancedBookingWithSwapInfo[];
+  swappableBookings: EnhancedBookingWithSwapInfo[];
+
   // UI state
   loading: boolean;
   error: string | null;
@@ -37,7 +51,7 @@ interface BookingsState {
   totalPages: number;
 
   // Selection state for swap creation (deprecated - use swapSpecification slice)
-  selectedBookingForSwap: BookingWithSwapInfo | null;
+  selectedBookingForSwap: EnhancedBookingWithSwapInfo | null;
 
   // Cache management
   lastFetchTime: number | null;
@@ -46,6 +60,10 @@ interface BookingsState {
   // Swap integration state (deprecated - use swapSpecification slice)
   swapInfoCache: Record<string, SwapInfo>; // bookingId -> SwapInfo
   lastSwapInfoUpdate: number | null;
+
+  // Completion tracking
+  completionInfoCache: Record<string, BookingSwapCompletion>; // bookingId -> BookingSwapCompletion
+  lastCompletionUpdate: number | null;
 }
 
 const initialState: BookingsState = {
@@ -81,6 +99,10 @@ const initialState: BookingsState = {
   // Swap integration state
   swapInfoCache: {},
   lastSwapInfoUpdate: null,
+
+  // Completion tracking
+  completionInfoCache: {},
+  lastCompletionUpdate: null,
 };
 
 export const bookingsSlice = createSlice({
@@ -106,24 +128,24 @@ export const bookingsSlice = createSlice({
       state.loading = false;
       state.error = null;
     },
-    
+
     // Enhanced booking management with swap integration
     setBookingsWithSwapInfo: (state, action: PayloadAction<BookingWithSwapInfo[]>) => {
       state.bookingsWithSwapInfo = action.payload;
       state.bookings = action.payload; // Keep backwards compatibility
-      
+
       // Update swappable bookings
-      state.swappableBookings = action.payload.filter(booking => 
+      state.swappableBookings = action.payload.filter(booking =>
         booking.swapInfo?.hasActiveProposals
       );
-      
+
       // Update swap info cache
       action.payload.forEach(booking => {
         if (booking.swapInfo) {
           state.swapInfoCache[booking.id] = booking.swapInfo;
         }
       });
-      
+
       state.lastFetchTime = Date.now();
       state.lastSwapInfoUpdate = Date.now();
       state.loading = false;
@@ -146,61 +168,61 @@ export const bookingsSlice = createSlice({
     // Swap information management
     updateSwapInfo: (state, action: PayloadAction<{ bookingId: string; swapInfo: SwapInfo }>) => {
       const { bookingId, swapInfo } = action.payload;
-      
+
       // Update in cache
       state.swapInfoCache[bookingId] = swapInfo;
-      
+
       // Update in bookings arrays
       const updateBookingSwapInfo = (booking: BookingWithSwapInfo) => {
         if (booking.id === bookingId) {
           booking.swapInfo = swapInfo;
         }
       };
-      
+
       state.bookings.forEach(updateBookingSwapInfo);
       state.bookingsWithSwapInfo.forEach(updateBookingSwapInfo);
       state.availableBookings.forEach(updateBookingSwapInfo);
-      
+
       // Update current booking if it matches
       if (state.currentBooking?.id === bookingId) {
         state.currentBooking.swapInfo = swapInfo;
       }
-      
+
       // Update swappable bookings
-      state.swappableBookings = state.bookings.filter(booking => 
+      state.swappableBookings = state.bookings.filter(booking =>
         booking.swapInfo?.hasActiveProposals
       );
-      
+
       state.lastSwapInfoUpdate = Date.now();
     },
-    
+
     removeSwapInfo: (state, action: PayloadAction<string>) => {
       const bookingId = action.payload;
-      
+
       // Remove from cache
       delete state.swapInfoCache[bookingId];
-      
+
       // Remove from bookings arrays
       const removeBookingSwapInfo = (booking: BookingWithSwapInfo) => {
         if (booking.id === bookingId) {
           booking.swapInfo = undefined;
         }
       };
-      
+
       state.bookings.forEach(removeBookingSwapInfo);
       state.bookingsWithSwapInfo.forEach(removeBookingSwapInfo);
       state.availableBookings.forEach(removeBookingSwapInfo);
-      
+
       // Update current booking if it matches
       if (state.currentBooking?.id === bookingId) {
         state.currentBooking.swapInfo = undefined;
       }
-      
+
       // Update swappable bookings
-      state.swappableBookings = state.bookings.filter(booking => 
+      state.swappableBookings = state.bookings.filter(booking =>
         booking.swapInfo?.hasActiveProposals
       );
-      
+
       state.lastSwapInfoUpdate = Date.now();
     },
 
@@ -324,6 +346,200 @@ export const bookingsSlice = createSlice({
         booking.status = status;
       }
     },
+
+    // Completion tracking actions
+    updateBookingCompletion: (
+      state,
+      action: PayloadAction<{
+        bookingId: string;
+        completion: BookingSwapCompletion;
+      }>
+    ) => {
+      const { bookingId, completion } = action.payload;
+
+      // Update in cache
+      state.completionInfoCache[bookingId] = completion;
+
+      // Update in bookings arrays
+      const updateBookingCompletion = (booking: EnhancedBookingWithSwapInfo) => {
+        if (booking.id === bookingId) {
+          booking.swapCompletion = completion;
+
+          // Update status if completion indicates swapped
+          if (completion.swappedAt && booking.status !== 'swapped') {
+            booking.status = 'swapped';
+          }
+
+          // Update ownership if there's a new owner
+          if (completion.newOwnerId && completion.newOwnerId !== booking.userId) {
+            booking.userId = completion.newOwnerId;
+          }
+        }
+      };
+
+      state.bookings.forEach(updateBookingCompletion);
+      state.bookingsWithSwapInfo.forEach(updateBookingCompletion);
+      state.availableBookings.forEach(updateBookingCompletion);
+
+      // Update current booking if it matches
+      if (state.currentBooking?.id === bookingId) {
+        updateBookingCompletion(state.currentBooking);
+      }
+
+      state.lastCompletionUpdate = Date.now();
+    },
+
+    updateMultipleBookingCompletions: (
+      state,
+      action: PayloadAction<Array<{
+        bookingId: string;
+        completion: BookingSwapCompletion;
+      }>>
+    ) => {
+      action.payload.forEach(({ bookingId, completion }) => {
+        // Update in cache
+        state.completionInfoCache[bookingId] = completion;
+
+        // Update in bookings arrays
+        const updateBookingCompletion = (booking: EnhancedBookingWithSwapInfo) => {
+          if (booking.id === bookingId) {
+            booking.swapCompletion = completion;
+
+            // Update status if completion indicates swapped
+            if (completion.swappedAt && booking.status !== 'swapped') {
+              booking.status = 'swapped';
+            }
+
+            // Update ownership if there's a new owner
+            if (completion.newOwnerId && completion.newOwnerId !== booking.userId) {
+              booking.userId = completion.newOwnerId;
+            }
+          }
+        };
+
+        state.bookings.forEach(updateBookingCompletion);
+        state.bookingsWithSwapInfo.forEach(updateBookingCompletion);
+        state.availableBookings.forEach(updateBookingCompletion);
+      });
+
+      state.lastCompletionUpdate = Date.now();
+    },
+
+    removeBookingCompletion: (state, action: PayloadAction<string>) => {
+      const bookingId = action.payload;
+
+      // Remove from cache
+      delete state.completionInfoCache[bookingId];
+
+      // Remove from bookings arrays
+      const removeBookingCompletion = (booking: EnhancedBookingWithSwapInfo) => {
+        if (booking.id === bookingId) {
+          booking.swapCompletion = undefined;
+        }
+      };
+
+      state.bookings.forEach(removeBookingCompletion);
+      state.bookingsWithSwapInfo.forEach(removeBookingCompletion);
+      state.availableBookings.forEach(removeBookingCompletion);
+
+      // Update current booking if it matches
+      if (state.currentBooking?.id === bookingId) {
+        state.currentBooking.swapCompletion = undefined;
+      }
+
+      state.lastCompletionUpdate = Date.now();
+    },
+
+    // Optimistic completion updates
+    optimisticBookingCompletion: (
+      state,
+      action: PayloadAction<{
+        bookingId: string;
+        proposalId: string;
+        completionType: 'booking_exchange' | 'cash_payment';
+        newOwnerId?: string;
+      }>
+    ) => {
+      const { bookingId, proposalId, completionType, newOwnerId } = action.payload;
+
+      const completion: BookingSwapCompletion = {
+        swappedAt: new Date(),
+        completionType,
+        proposalId,
+        swapTransactionId: `optimistic-${Date.now()}`,
+        newOwnerId,
+      };
+
+      // Update in cache
+      state.completionInfoCache[bookingId] = completion;
+
+      // Update in bookings arrays
+      const updateBookingCompletion = (booking: EnhancedBookingWithSwapInfo) => {
+        if (booking.id === bookingId) {
+          booking.swapCompletion = completion;
+
+          // Optimistically update status
+          booking.status = 'swapped';
+
+          // Update ownership if there's a new owner
+          if (newOwnerId && newOwnerId !== booking.userId) {
+            completion.originalOwnerId = booking.userId;
+            booking.userId = newOwnerId;
+          }
+        }
+      };
+
+      state.bookings.forEach(updateBookingCompletion);
+      state.bookingsWithSwapInfo.forEach(updateBookingCompletion);
+      state.availableBookings.forEach(updateBookingCompletion);
+
+      // Update current booking if it matches
+      if (state.currentBooking?.id === bookingId) {
+        updateBookingCompletion(state.currentBooking);
+      }
+
+      state.lastCompletionUpdate = Date.now();
+    },
+
+    rollbackOptimisticBookingCompletion: (
+      state,
+      action: PayloadAction<{
+        bookingId: string;
+        originalStatus: BookingStatus;
+        originalOwnerId?: string;
+      }>
+    ) => {
+      const { bookingId, originalStatus, originalOwnerId } = action.payload;
+
+      // Remove from cache
+      delete state.completionInfoCache[bookingId];
+
+      // Rollback in bookings arrays
+      const rollbackBookingCompletion = (booking: EnhancedBookingWithSwapInfo) => {
+        if (booking.id === bookingId) {
+          booking.swapCompletion = undefined;
+
+          // Restore original status
+          booking.status = originalStatus;
+
+          // Restore original ownership if needed
+          if (originalOwnerId && originalOwnerId !== booking.userId) {
+            booking.userId = originalOwnerId;
+          }
+        }
+      };
+
+      state.bookings.forEach(rollbackBookingCompletion);
+      state.bookingsWithSwapInfo.forEach(rollbackBookingCompletion);
+      state.availableBookings.forEach(rollbackBookingCompletion);
+
+      // Update current booking if it matches
+      if (state.currentBooking?.id === bookingId) {
+        rollbackBookingCompletion(state.currentBooking);
+      }
+
+      state.lastCompletionUpdate = Date.now();
+    },
   },
 });
 
@@ -370,6 +586,13 @@ export const {
 
   // Optimistic updates
   optimisticUpdateBookingStatus,
+
+  // Completion tracking actions
+  updateBookingCompletion,
+  updateMultipleBookingCompletions,
+  removeBookingCompletion,
+  optimisticBookingCompletion,
+  rollbackOptimisticBookingCompletion,
 } = bookingsSlice.actions;
 
 // Selectors
@@ -459,15 +682,15 @@ export const selectFilteredBookingsWithSwapInfo = (state: { bookings: BookingsSt
   }
 
   if (filters.acceptsCash) {
-    filtered = filtered.filter(booking => 
+    filtered = filtered.filter(booking =>
       booking.swapInfo?.paymentTypes.includes('cash')
     );
   }
 
   if (filters.auctionMode) {
-    filtered = filtered.filter(booking => 
+    filtered = filtered.filter(booking =>
       booking.swapInfo?.acceptanceStrategy === 'auction' &&
-      booking.swapInfo?.auctionEndDate && 
+      booking.swapInfo?.auctionEndDate &&
       new Date(booking.swapInfo.auctionEndDate) > new Date()
     );
   }
@@ -475,16 +698,16 @@ export const selectFilteredBookingsWithSwapInfo = (state: { bookings: BookingsSt
   if (filters.swapType) {
     filtered = filtered.filter(booking => {
       if (!booking.swapInfo) return false;
-      
+
       switch (filters.swapType) {
         case 'booking':
-          return booking.swapInfo.paymentTypes.includes('booking') && 
-                 !booking.swapInfo.paymentTypes.includes('cash');
+          return booking.swapInfo.paymentTypes.includes('booking') &&
+            !booking.swapInfo.paymentTypes.includes('cash');
         case 'cash':
           return booking.swapInfo.paymentTypes.includes('cash');
         case 'both':
-          return booking.swapInfo.paymentTypes.includes('booking') && 
-                 booking.swapInfo.paymentTypes.includes('cash');
+          return booking.swapInfo.paymentTypes.includes('booking') &&
+            booking.swapInfo.paymentTypes.includes('cash');
         default:
           return true;
       }
@@ -495,12 +718,12 @@ export const selectFilteredBookingsWithSwapInfo = (state: { bookings: BookingsSt
   if (filters.priceRange?.min || filters.priceRange?.max) {
     filtered = filtered.filter(booking => {
       if (!booking.swapInfo?.minCashAmount) return true;
-      
-      const minMatch = !filters.priceRange?.min || 
-                      booking.swapInfo.minCashAmount >= filters.priceRange.min;
-      const maxMatch = !filters.priceRange?.max || 
-                      booking.swapInfo.minCashAmount <= filters.priceRange.max;
-      
+
+      const minMatch = !filters.priceRange?.min ||
+        booking.swapInfo.minCashAmount >= filters.priceRange.min;
+      const maxMatch = !filters.priceRange?.max ||
+        booking.swapInfo.minCashAmount <= filters.priceRange.max;
+
       return minMatch && maxMatch;
     });
   }
@@ -509,19 +732,19 @@ export const selectFilteredBookingsWithSwapInfo = (state: { bookings: BookingsSt
 };
 
 export const selectBookingsWithActiveSwaps = (state: { bookings: BookingsState }) =>
-  state.bookings.bookingsWithSwapInfo.filter(booking => 
+  state.bookings.bookingsWithSwapInfo.filter(booking =>
     booking.swapInfo?.hasActiveProposals
   );
 
 export const selectBookingsAcceptingCash = (state: { bookings: BookingsState }) =>
-  state.bookings.bookingsWithSwapInfo.filter(booking => 
+  state.bookings.bookingsWithSwapInfo.filter(booking =>
     booking.swapInfo?.paymentTypes.includes('cash')
   );
 
 export const selectActiveAuctionBookings = (state: { bookings: BookingsState }) =>
-  state.bookings.bookingsWithSwapInfo.filter(booking => 
+  state.bookings.bookingsWithSwapInfo.filter(booking =>
     booking.swapInfo?.acceptanceStrategy === 'auction' &&
-    booking.swapInfo?.auctionEndDate && 
+    booking.swapInfo?.auctionEndDate &&
     new Date(booking.swapInfo.auctionEndDate) > new Date()
   );
 
@@ -531,21 +754,93 @@ export const selectBookingsByUserRole = (
   role: 'owner' | 'browser' | 'proposer'
 ) => {
   const bookings = state.bookings.bookingsWithSwapInfo;
-  
+
   switch (role) {
     case 'owner':
       return bookings.filter(booking => booking.userId === userId);
     case 'browser':
-      return bookings.filter(booking => 
-        booking.userId !== userId && 
+      return bookings.filter(booking =>
+        booking.userId !== userId &&
         booking.swapInfo?.hasActiveProposals
       );
     case 'proposer':
-      return bookings.filter(booking => 
-        booking.swapInfo?.userProposalStatus && 
+      return bookings.filter(booking =>
+        booking.swapInfo?.userProposalStatus &&
         booking.swapInfo.userProposalStatus !== 'none'
       );
     default:
       return bookings;
   }
 };
+// Completion-related selectors
+export const selectBookingCompletion = (
+  state: { bookings: BookingsState },
+  bookingId: string
+) => {
+  const booking = state.bookings.bookings.find(b => b.id === bookingId);
+  return booking?.swapCompletion || state.bookings.completionInfoCache[bookingId];
+};
+
+export const selectBookingsWithCompletion = (state: { bookings: BookingsState }) =>
+  state.bookings.bookings.filter(booking => booking.swapCompletion);
+
+export const selectBookingsByCompletionType = (
+  state: { bookings: BookingsState },
+  completionType: 'booking_exchange' | 'cash_payment'
+) => state.bookings.bookings.filter(
+  booking => booking.swapCompletion?.completionType === completionType
+);
+
+export const selectBookingsByProposal = (
+  state: { bookings: BookingsState },
+  proposalId: string
+) => state.bookings.bookings.filter(
+  booking => booking.swapCompletion?.proposalId === proposalId
+);
+
+export const selectRelatedCompletedBookings = (
+  state: { bookings: BookingsState },
+  bookingId: string
+) => {
+  const booking = state.bookings.bookings.find(b => b.id === bookingId);
+  if (!booking?.swapCompletion?.relatedBookingSwaps) return [];
+
+  return state.bookings.bookings.filter(b =>
+    booking.swapCompletion!.relatedBookingSwaps!.includes(b.id)
+  );
+};
+
+export const selectRecentlySwappedBookings = (state: { bookings: BookingsState }) => {
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  return state.bookings.bookings.filter(booking => {
+    if (!booking.swapCompletion?.swappedAt) return false;
+    return new Date(booking.swapCompletion.swappedAt) > twentyFourHoursAgo;
+  });
+};
+
+export const selectBookingsWithOwnershipTransfer = (state: { bookings: BookingsState }) =>
+  state.bookings.bookings.filter(booking =>
+    booking.swapCompletion?.originalOwnerId &&
+    booking.swapCompletion?.newOwnerId
+  );
+
+export const selectBookingsByOriginalOwner = (
+  state: { bookings: BookingsState },
+  originalOwnerId: string
+) => state.bookings.bookings.filter(
+  booking => booking.swapCompletion?.originalOwnerId === originalOwnerId
+);
+
+export const selectBookingsByNewOwner = (
+  state: { bookings: BookingsState },
+  newOwnerId: string
+) => state.bookings.bookings.filter(
+  booking => booking.swapCompletion?.newOwnerId === newOwnerId
+);
+
+export const selectCompletionInfoCache = (state: { bookings: BookingsState }) =>
+  state.bookings.completionInfoCache;
+
+export const selectLastCompletionUpdate = (state: { bookings: BookingsState }) =>
+  state.bookings.lastCompletionUpdate;

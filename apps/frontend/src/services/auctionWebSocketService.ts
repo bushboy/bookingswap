@@ -13,12 +13,12 @@ import { SwapAuction, AuctionProposal } from '@booking-swap/shared';
 
 interface WebSocketMessage {
   type:
-    | 'auction_updated'
-    | 'proposal_added'
-    | 'proposal_updated'
-    | 'auction_ended'
-    | 'time_update'
-    | 'error';
+  | 'auction_updated'
+  | 'proposal_added'
+  | 'proposal_updated'
+  | 'auction_ended'
+  | 'time_update'
+  | 'error';
   data: any;
 }
 
@@ -40,7 +40,7 @@ class AuctionWebSocketService {
     // Determine WebSocket URL based on environment
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host =
-      process.env.NODE_ENV === 'production'
+      import.meta.env.PROD
         ? window.location.host
         : 'localhost:3001'; // Backend WebSocket port
 

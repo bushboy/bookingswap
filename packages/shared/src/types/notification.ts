@@ -52,7 +52,12 @@ export type NotificationType =
   | 'proposal_accepted'
   | 'proposal_rejected'
   | 'proposal_payment_completed'
-  | 'proposal_payment_failed';
+  | 'proposal_payment_failed'
+  // Swap completion notifications
+  | 'swap_completion_success'
+  | 'swap_completion_failed'
+  | 'booking_ownership_transferred'
+  | 'completion_validation_warning';
 
 export type NotificationChannel = 'email' | 'sms' | 'push' | 'in_app';
 
@@ -295,4 +300,86 @@ export interface ProposalPaymentNotificationData extends NotificationData {
   payerUserId: string;
   swapId?: string;
   errorMessage?: string;
+}
+
+// Swap completion notification data interfaces
+export interface SwapCompletionNotificationData extends NotificationData {
+  proposalId: string;
+  completionType: 'booking_exchange' | 'cash_payment';
+  completedSwaps: Array<{
+    swapId: string;
+    previousStatus: string;
+    newStatus: string;
+    completedAt: Date;
+  }>;
+  updatedBookings: Array<{
+    bookingId: string;
+    previousStatus: string;
+    newStatus: string;
+    swappedAt: Date;
+    newOwnerId?: string;
+  }>;
+  blockchainTransaction?: {
+    transactionId: string;
+    consensusTimestamp?: string;
+  };
+  completionTimestamp: Date;
+  sourceSwapDetails: {
+    title: string;
+    location: string;
+    dates: string;
+    value: number;
+    accommodationType: string;
+    guests: number;
+  };
+  targetSwapDetails?: {
+    title: string;
+    location: string;
+    dates: string;
+    value: number;
+    accommodationType: string;
+    guests: number;
+  };
+  cashOffer?: {
+    amount: number;
+    currency: string;
+  };
+}
+
+export interface BookingOwnershipTransferNotificationData extends NotificationData {
+  proposalId: string;
+  bookingId: string;
+  previousOwnerId: string;
+  newOwnerId: string;
+  transferredAt: Date;
+  bookingDetails: {
+    title: string;
+    location: string;
+    dates: string;
+    value: number;
+    accommodationType: string;
+    guests: number;
+  };
+  exchangePartnerDetails: {
+    name: string;
+    bookingTitle: string;
+    bookingLocation: string;
+    bookingDates: string;
+  };
+}
+
+export interface CompletionValidationWarningData extends NotificationData {
+  proposalId: string;
+  validationErrors: string[];
+  validationWarnings: string[];
+  inconsistentEntities: string[];
+  correctionAttempts?: Array<{
+    entityType: 'swap' | 'booking' | 'proposal';
+    entityId: string;
+    expectedStatus: string;
+    actualStatus: string;
+    correctionApplied: boolean;
+    correctionError?: string;
+  }>;
+  requiresManualReview: boolean;
 }

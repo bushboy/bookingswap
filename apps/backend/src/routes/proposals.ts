@@ -7,6 +7,9 @@ import {
     validateRejectionRequest,
     validateProposalResponsesQuery
 } from '../middleware/proposalValidation';
+import {
+    validateProposalAcceptanceWithCompletion
+} from '../middleware/completionValidation';
 
 export function createProposalRoutes(
     proposalController: ProposalController,
@@ -25,6 +28,7 @@ export function createProposalRoutes(
     // Proposal action endpoints with validation
     router.post('/:proposalId/accept',
         validateProposalId,
+        validateProposalAcceptanceWithCompletion,
         proposalController.acceptProposal
     );
 

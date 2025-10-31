@@ -5,6 +5,7 @@ import { DisputeManagement } from '../components/admin/DisputeManagement';
 import { UserManagement } from '../components/admin/UserManagement';
 import { SystemMaintenance } from '../components/admin/SystemMaintenance';
 import { useAppSelector } from '../store/hooks';
+import { WALLET_CONFIG } from '../../tests/fixtures/wallet-config';
 
 type AdminTab = 'dashboard' | 'disputes' | 'users' | 'maintenance';
 
@@ -33,8 +34,8 @@ export const AdminPage: React.FC = () => {
 
     // Mock admin check - in production, verify with backend
     const isAdmin =
-      user.walletAddress === '0.0.123456' ||
-      user.walletAddress === '0.0.789012';
+      user.walletAddress === WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT ||
+      user.walletAddress === WALLET_CONFIG.SECONDARY_TESTNET_ACCOUNT;
     if (!isAdmin) {
       navigate('/dashboard');
       return;
@@ -89,8 +90,8 @@ export const AdminPage: React.FC = () => {
                     <button
                       onClick={() => setActiveTab(tab.id)}
                       className={`w-full flex items-center px-4 py-2 text-left rounded-md transition-colors ${activeTab === tab.id
-                          ? 'bg-blue-100 text-blue-700 font-medium'
-                          : 'text-gray-600 hover:bg-gray-100'
+                        ? 'bg-blue-100 text-blue-700 font-medium'
+                        : 'text-gray-600 hover:bg-gray-100'
                         }`}
                     >
                       <span className="mr-3">{tab.icon}</span>

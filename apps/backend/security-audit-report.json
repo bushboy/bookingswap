@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-22T16:37:41.251Z",
+  "timestamp": "2025-10-31T06:57:41.812Z",
   "target": "http://localhost:3000",
   "scans": {
     "nmap": "Nmap scan skipped - tool not available",

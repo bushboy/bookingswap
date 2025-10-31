@@ -20,6 +20,7 @@ import {
   setError,
   clearError,
   setPreferences,
+  initializeWalletService,
 } from '@/store/slices/walletSlice';
 import {
   selectIsWalletConnected,
@@ -31,7 +32,7 @@ import {
   selectWalletPreferences,
   selectShouldAttemptAutoConnect,
 } from '@/store/selectors/walletSelectors';
-import { WalletConnection, AccountInfo, WalletError } from '@/types/wallet';
+import { AccountInfo, WalletError } from '@/types/wallet';
 
 interface WalletContextValue {
   // Connection methods
@@ -110,7 +111,7 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
 
         // Update user's wallet address in the backend
         console.log('DEBUG: Wallet connected, account info:', accountInfo);
-        if (accountInfo.accountId) {
+        if (accountInfo && accountInfo.accountId) {
           console.log('DEBUG: Calling updateUserWalletAddress with:', accountInfo.accountId);
           await updateUserWalletAddress(accountInfo.accountId);
         } else {
@@ -156,7 +157,7 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
         walletService.saveAccountInfo(accountInfo);
 
         // Update user's wallet address in the backend
-        if (accountInfo.accountId) {
+        if (accountInfo && accountInfo.accountId) {
           await updateUserWalletAddress(accountInfo.accountId);
         }
 
@@ -206,10 +207,10 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
     }
   }, [dispatch]);
 
-  // Provider management
+  // Provider management (simplified)
   const refreshAvailableProviders = useCallback(async () => {
     try {
-      const providers = await walletService.getAvailableProviders();
+      const providers = walletService.getAvailableProviders();
       const providerIds = providers.map(provider => provider.id);
       dispatch(setAvailableProviders(providerIds));
     } catch (error) {
@@ -219,8 +220,7 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
 
   const getProviderAvailabilityStatus = useCallback(async () => {
     try {
-      const availabilityStatus =
-        await walletService.getProviderAvailabilityStatus();
+      const availabilityStatus = walletService.getProviderAvailabilityStatus();
       return Object.fromEntries(availabilityStatus);
     } catch (error) {
       console.warn('Failed to get provider availability status:', error);
@@ -240,38 +240,41 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
     }
 
     try {
-      const connection = await walletService.restoreConnection();
-      if (connection) {
-        // Try to load cached account info first
-        let accountInfo = walletService.loadAccountInfo();
+      const restored = await walletService.restoreConnection();
+      if (restored) {
+        const connection = walletService.getConnection();
+        if (connection && typeof connection === 'object' && 'accountId' in connection) {
+          // Try to load cached account info first
+          let accountInfo = walletService.loadAccountInfo();
 
-        // If no cached account info or it's expired, fetch fresh data
-        if (!accountInfo) {
-          try {
-            accountInfo = await walletService.getAccountInfo();
-            // Save the fresh account info
-            walletService.saveAccountInfo(accountInfo);
-          } catch (error) {
-            console.warn(
-              'Failed to fetch account info during restoration:',
-              error
-            );
-            // Use basic account info from connection
-            accountInfo = {
-              accountId: connection.accountId,
-              balance: '0',
-              network: connection.network,
-            };
+          // If no cached account info or it's expired, fetch fresh data
+          if (!accountInfo) {
+            try {
+              accountInfo = await walletService.getAccountInfo();
+              // Save the fresh account info
+              walletService.saveAccountInfo(accountInfo);
+            } catch (error) {
+              console.warn(
+                'Failed to fetch account info during restoration:',
+                error
+              );
+              // Use basic account info from connection
+              accountInfo = {
+                accountId: connection.accountId,
+                balance: '0',
+                network: connection.network,
+              };
+            }
           }
-        }
 
-        dispatch(
-          connectWalletSuccess({
-            connection,
-            accountInfo,
-            provider: preferences.lastUsedProvider!,
-          })
-        );
+          dispatch(
+            connectWalletSuccess({
+              connection,
+              accountInfo,
+              provider: preferences.lastUsedProvider!,
+            })
+          );
+        }
       }
     } catch (error) {
       console.warn('Failed to restore wallet connection:', error);
@@ -283,11 +286,46 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
 
   // Initialize wallet service and set up event listeners
   useEffect(() => {
+    console.log('🔄 WalletContext: Starting initialization...');
+
     // Initialize wallet providers first
-    initializeWalletProviders();
+    try {
+      initializeWalletProviders();
+
+      // Verify initialization completed
+      const initStatus = walletService.getInitializationStatus();
+      console.log('🔍 WalletContext: Initialization status:', initStatus);
+
+      if (!initStatus.isInitialized || initStatus.providerCount === 0) {
+        console.error('❌ WalletContext: Initialization failed or no providers registered');
+      } else {
+        // Update Redux state with initialization status and available providers
+        console.log('✅ WalletContext: Updating Redux state with provider information');
+
+        // Mark wallet service as initialized in Redux
+        dispatch(initializeWalletService());
+
+        // Update available providers in Redux
+        const providers = walletService.getAvailableProviders();
+        const providerIds = providers.map(provider => provider.id);
+        dispatch(setAvailableProviders(providerIds));
+
+        console.log('✅ WalletContext: Redux state updated with providers:', providerIds);
+
+        // Debug: Check Redux state after update
+        setTimeout(() => {
+          console.log('🔍 WalletContext: Checking Redux state after update...');
+          // We can't access selectors directly here, but we can check the service state
+          const serviceValidation = walletService.validateServiceState();
+          console.log('🔍 Service validation after Redux update:', serviceValidation);
+        }, 100);
+      }
+    } catch (error) {
+      console.error('❌ WalletContext: Failed to initialize wallet providers:', error);
+    }
 
     // Set up wallet service event listeners
-    const handleConnect = (connection: WalletConnection) => {
+    const handleConnect = () => {
       // Connection is handled by the connect method
     };
 
@@ -299,7 +337,7 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
       dispatch(updateAccountInfo(accountInfo));
     };
 
-    const handleNetworkChanged = (network: string) => {
+    const handleNetworkChanged = () => {
       // Refresh account info when network changes
       refreshAccountInfo();
     };
@@ -308,7 +346,7 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
       dispatch(setError(error));
     };
 
-    const handleProviderChanged = (providerId: string) => {
+    const handleProviderChanged = () => {
       // Provider change is handled by connect/switch methods
     };
 
@@ -330,17 +368,11 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
       handleProvidersAvailabilityChanged
     );
 
-    // Initial setup
-    refreshAvailableProviders();
-
-    // Attempt connection restoration after a short delay to allow providers to initialize
-    const restoreTimer = setTimeout(() => {
-      attemptConnectionRestoration();
-    }, 1000);
+    // Attempt connection restoration immediately (no provider checking needed)
+    attemptConnectionRestoration();
 
     // Cleanup
     return () => {
-      clearTimeout(restoreTimer);
       walletService.removeEventListener('connect', handleConnect);
       walletService.removeEventListener('disconnect', handleDisconnect);
       walletService.removeEventListener('accountChanged', handleAccountChanged);
@@ -357,7 +389,6 @@ export const WalletContextProvider: React.FC<WalletContextProviderProps> = ({
     };
   }, [
     dispatch,
-    refreshAvailableProviders,
     attemptConnectionRestoration,
     refreshAccountInfo,
   ]);

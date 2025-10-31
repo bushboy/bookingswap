@@ -214,7 +214,7 @@ export const useBookingListPerformance = (bookings: Booking[]) => {
             lastRenderTimeRef.current = startTime;
 
             // Log performance warnings in development
-            if (process.env.NODE_ENV === 'development') {
+            if (import.meta.env.DEV) {
                 if (renderDuration > 100) {
                     console.warn(`Slow booking list render: ${renderDuration}ms for ${bookings.length} items`);
                 }

@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useAppSelector } from '@/store/hooks';
 import { useWalletContext } from '@/contexts/WalletContext';
 import {
@@ -12,7 +12,7 @@ import {
   selectWalletError,
   selectAvailableProviders,
   selectTruncatedWalletAddress,
-  selectCanConnect,
+
   selectCanDisconnect,
   selectShouldShowConnectButton,
   selectShouldShowWalletInfo,
@@ -25,8 +25,15 @@ import {
   selectHasWalletError,
   selectWalletErrorMessage,
   selectWalletErrorType,
+  selectCanConnectWallet,
+  selectConnectionBlockers,
+  selectConnectionValidationState,
+  selectHasConnectionBlockers,
+  selectConnectionValidationDetails,
+  selectConnectionEdgeCases,
+  selectProviderValidationState,
 } from '@/store/selectors/walletSelectors';
-import { WalletError } from '@/types/wallet';
+import { walletService, ConnectionValidator } from '@/services/wallet';
 
 /**
  * Main wallet hook that provides all wallet functionality
@@ -47,7 +54,6 @@ export const useWallet = () => {
 
   // Computed selectors
   const truncatedAddress = useAppSelector(selectTruncatedWalletAddress);
-  const canConnect = useAppSelector(selectCanConnect);
   const canDisconnect = useAppSelector(selectCanDisconnect);
   const shouldShowConnectButton = useAppSelector(selectShouldShowConnectButton);
   const shouldShowWalletInfo = useAppSelector(selectShouldShowWalletInfo);
@@ -64,6 +70,12 @@ export const useWallet = () => {
   const hasError = useAppSelector(selectHasWalletError);
   const errorMessage = useAppSelector(selectWalletErrorMessage);
   const errorType = useAppSelector(selectWalletErrorType);
+
+  // Enhanced validation selectors
+  const canConnectWallet = useAppSelector(selectCanConnectWallet);
+  const connectionBlockers = useAppSelector(selectConnectionBlockers);
+  const validationState = useAppSelector(selectConnectionValidationState);
+  const hasBlockers = useAppSelector(selectHasConnectionBlockers);
 
   return {
     // Connection methods
@@ -89,7 +101,7 @@ export const useWallet = () => {
 
     // Computed state
     truncatedAddress,
-    canConnect,
+    canConnect: canConnectWallet, // Use enhanced validation
     canDisconnect,
     shouldShowConnectButton,
     shouldShowWalletInfo,
@@ -104,11 +116,16 @@ export const useWallet = () => {
     hasError,
     errorMessage,
     errorType,
+
+    // Enhanced validation properties
+    connectionBlockers,
+    validationState,
+    hasBlockers,
   };
 };
 
 /**
- * Hook for wallet connection operations
+ * Hook for wallet connection operations with enhanced validation
  */
 export const useWalletConnection = () => {
   const {
@@ -117,14 +134,57 @@ export const useWalletConnection = () => {
     switchProvider,
     isConnected,
     isConnecting,
-    canConnect,
     canDisconnect,
   } = useWallet();
 
+  // Enhanced validation selectors
+  const canConnectWallet = useAppSelector(selectCanConnectWallet);
+  const connectionBlockers = useAppSelector(selectConnectionBlockers);
+  const validationState = useAppSelector(selectConnectionValidationState);
+  const hasBlockers = useAppSelector(selectHasConnectionBlockers);
+
+  // Create connection validator instance
+  const connectionValidator = useMemo(() => {
+    return new ConnectionValidator(walletService);
+  }, []);
+
   const connectWallet = useCallback(
     async (providerId: string) => {
-      if (!canConnect) {
-        throw new Error('Cannot connect wallet at this time');
+      // Debug logging for connection attempts
+      console.log('🔌 Attempting to connect wallet:', providerId);
+
+      // Check service status before connection
+      const serviceStatus = walletService.validateServiceState();
+      console.log('🔍 Wallet service status:', serviceStatus);
+
+      // Use enhanced validation instead of simple canConnect
+      if (!canConnectWallet) {
+        const blockers = connectionBlockers.length > 0
+          ? connectionBlockers.join(', ')
+          : 'Unknown validation error';
+
+        console.error('❌ Cannot connect wallet:', {
+          providerId,
+          blockers: connectionBlockers,
+          serviceStatus,
+        });
+
+        throw new Error(`Cannot connect wallet: ${blockers}`);
+      }
+
+      // Validate specific provider
+      const providerValidation = connectionValidator.validateProviderAvailability(providerId);
+      if (!providerValidation.isValid) {
+        const blockers = providerValidation.blockers.join(', ');
+        throw new Error(`Cannot connect to ${providerId}: ${blockers}`);
+      }
+
+      // Initialize wallet service if needed
+      try {
+        await connectionValidator.initializeIfNeeded();
+      } catch (error) {
+        console.error('Failed to initialize wallet service:', error);
+        throw new Error('Wallet service initialization failed');
       }
 
       try {
@@ -134,7 +194,7 @@ export const useWalletConnection = () => {
         throw error;
       }
     },
-    [connect, canConnect]
+    [connect, canConnectWallet, connectionBlockers, connectionValidator]
   );
 
   const disconnectWallet = useCallback(async () => {
@@ -152,6 +212,13 @@ export const useWalletConnection = () => {
 
   const switchWalletProvider = useCallback(
     async (providerId: string) => {
+      // Validate provider before switching
+      const providerValidation = connectionValidator.validateProviderAvailability(providerId);
+      if (!providerValidation.isValid) {
+        const blockers = providerValidation.blockers.join(', ');
+        throw new Error(`Cannot switch to ${providerId}: ${blockers}`);
+      }
+
       try {
         await switchProvider(providerId);
       } catch (error) {
@@ -159,8 +226,16 @@ export const useWalletConnection = () => {
         throw error;
       }
     },
-    [switchProvider]
+    [switchProvider, connectionValidator]
   );
+
+  const validateConnection = useCallback(() => {
+    return connectionValidator.validateConnectionState();
+  }, [connectionValidator]);
+
+  const getConnectionSummary = useCallback(() => {
+    return connectionValidator.getValidationSummary();
+  }, [connectionValidator]);
 
   return {
     connect: connectWallet,
@@ -168,8 +243,14 @@ export const useWalletConnection = () => {
     switchProvider: switchWalletProvider,
     isConnected,
     isConnecting,
-    canConnect,
+    canConnect: canConnectWallet,
     canDisconnect,
+    // Enhanced validation properties
+    connectionBlockers,
+    validationState,
+    hasBlockers,
+    validateConnection,
+    getConnectionSummary,
   };
 };
 
@@ -302,9 +383,10 @@ export const useWalletStatus = () => {
     isConnecting,
     connectionStatus,
     hasError,
-    canConnect,
     canDisconnect,
   } = useWallet();
+
+  const canConnect = useAppSelector(selectCanConnectWallet);
 
   return {
     isConnected,
@@ -315,5 +397,104 @@ export const useWalletStatus = () => {
     canDisconnect,
     isIdle: connectionStatus === 'idle',
     isError: connectionStatus === 'error',
+  };
+};
+
+/**
+ * Hook for wallet connection validation with detailed error information
+ */
+export const useWalletValidation = () => {
+  const canConnectWallet = useAppSelector(selectCanConnectWallet);
+  const connectionBlockers = useAppSelector(selectConnectionBlockers);
+  const validationState = useAppSelector(selectConnectionValidationState);
+  const validationDetails = useAppSelector(selectConnectionValidationDetails);
+  const edgeCases = useAppSelector(selectConnectionEdgeCases);
+  const hasBlockers = useAppSelector(selectHasConnectionBlockers);
+
+  // Create connection validator instance
+  const connectionValidator = useMemo(() => {
+    return new ConnectionValidator(walletService);
+  }, []);
+
+  const validateConnection = useCallback(() => {
+    return connectionValidator.validateConnectionState();
+  }, [connectionValidator]);
+
+  const validateProvider = useCallback((providerId: string) => {
+    return connectionValidator.validateProviderAvailability(providerId);
+  }, [connectionValidator]);
+
+  const initializeIfNeeded = useCallback(async () => {
+    return connectionValidator.initializeIfNeeded();
+  }, [connectionValidator]);
+
+  const getValidationSummary = useCallback(() => {
+    return connectionValidator.getValidationSummary();
+  }, [connectionValidator]);
+
+  const getConnectionErrorMessage = useCallback(() => {
+    if (connectionBlockers.length === 0) {
+      return null;
+    }
+
+    if (connectionBlockers.length === 1) {
+      return connectionBlockers[0];
+    }
+
+    return `Multiple issues prevent connection: ${connectionBlockers.join(', ')}`;
+  }, [connectionBlockers]);
+
+  return {
+    // Validation state
+    canConnect: canConnectWallet,
+    connectionBlockers,
+    validationState,
+    validationDetails,
+    edgeCases,
+    hasBlockers,
+
+    // Validation methods
+    validateConnection,
+    validateProvider,
+    initializeIfNeeded,
+    getValidationSummary,
+    getConnectionErrorMessage,
+
+    // Convenience properties
+    isValid: canConnectWallet,
+    errorMessage: getConnectionErrorMessage(),
+    hasEdgeCases: edgeCases.hasEdgeCases,
+    isStateConsistent: edgeCases.isStateConsistent,
+  };
+};
+
+/**
+ * Hook for provider-specific validation
+ */
+export const useProviderValidation = (providerId?: string) => {
+  const providerValidation = useAppSelector(state =>
+    selectProviderValidationState(state, providerId)
+  );
+
+  const connectionValidator = useMemo(() => {
+    return new ConnectionValidator(walletService);
+  }, []);
+
+  const validateProvider = useCallback(() => {
+    if (!providerId) {
+      return {
+        isValid: false,
+        blockers: ['No provider specified'],
+        error: new Error('No provider specified'),
+      };
+    }
+
+    return connectionValidator.validateProviderAvailability(providerId);
+  }, [providerId, connectionValidator]);
+
+  return {
+    ...providerValidation,
+    validateProvider,
+    providerId,
   };
 };

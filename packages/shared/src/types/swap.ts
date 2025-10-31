@@ -1,5 +1,6 @@
 import { BaseEntity } from './index.js';
 import { BookingDetails } from './swap-with-booking-details.js';
+import { SwapCompletion } from './swap-completion.js';
 
 export type SwapStatus = 'pending' | 'active' | 'accepted' | 'rejected' | 'completed' | 'cancelled';
 
@@ -27,6 +28,7 @@ export interface Swap extends BaseEntity {
   terms: SwapTerms;
   blockchain: SwapBlockchain;
   timeline: SwapTimeline;
+  completion?: SwapCompletion;
 }
 
 // Interface for swap data with derived relationships
@@ -81,6 +83,7 @@ export interface EnhancedSwap extends Swap {
   acceptanceStrategy: AcceptanceStrategy;
   auctionId?: string;
   cashDetails?: CashSwapConfiguration;
+  completion?: SwapCompletion;
 }
 
 // Enhanced Swap Creation Request
@@ -190,6 +193,9 @@ export interface SwapProposal extends BaseEntity {
     proposalTransactionId?: string;
     responseTransactionId?: string;
   };
+
+  // Completion tracking
+  completionAuditId?: string;
 
   // Additional metadata
   message?: string;

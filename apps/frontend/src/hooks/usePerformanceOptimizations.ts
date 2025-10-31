@@ -287,7 +287,7 @@ export const useRenderOptimization = (componentName: string) => {
   lastRenderTimeRef.current = now;
 
   // Warn about excessive re-renders in development
-  if (process.env.NODE_ENV === 'development' && currentRenderCount > 10) {
+  if (import.meta.env.DEV && currentRenderCount > 10) {
     const timeSinceMount = now - (lastRenderTimeRef.current - timeSinceLastRender * currentRenderCount);
     if (timeSinceMount < 5000) { // More than 10 renders in 5 seconds
       console.warn(`Excessive re-renders detected in ${componentName}: ${currentRenderCount} renders in ${timeSinceMount}ms`);

@@ -24,6 +24,9 @@ import { getSwapMatchingCacheConfig } from './cache-config';
 import { SwapMatchingQueryOptimizer } from '../../database/optimizations/SwapMatchingQueryOptimizer';
 import { ProposalAcceptanceService } from './ProposalAcceptanceService';
 import { ProposalTransactionManager } from './ProposalTransactionManager';
+import { SwapCompletionOrchestrator } from './SwapCompletionOrchestrator';
+import { SwapCompletionAuditService } from './SwapCompletionAuditService';
+import { SwapCompletionAuditCleanupService } from './SwapCompletionAuditCleanupService';
 import {
   createNotificationService,
   createAuctionNotificationService,
@@ -175,4 +178,32 @@ export function createSwapMatchingService(
     notificationService,
     swapCacheService
   );
+}
+
+export function createSwapCompletionOrchestrator(
+  pool: Pool,
+  hederaService: HederaService,
+  notificationService: NotificationService
+): SwapCompletionOrchestrator {
+  return new SwapCompletionOrchestrator(
+    pool,
+    hederaService,
+    notificationService
+  );
+}
+
+export function createSwapCompletionAuditService(pool: Pool): SwapCompletionAuditService {
+  return new SwapCompletionAuditService(pool);
+}
+
+export function createSwapCompletionAuditCleanupService(
+  pool: Pool,
+  config: {
+    retentionDays: number;
+    batchSize: number;
+    intervalHours: number;
+    enabled: boolean;
+  }
+): SwapCompletionAuditCleanupService {
+  return new SwapCompletionAuditCleanupService(pool, config);
 }

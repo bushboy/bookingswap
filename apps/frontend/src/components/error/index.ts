@@ -1,6 +1,8 @@
 // Error Boundary Components
 export { ComponentErrorBoundary } from './ComponentErrorBoundary';
 export type { ComponentErrorBoundaryProps, ErrorFallbackProps } from './ComponentErrorBoundary';
+export { default as ProposalErrorBoundary } from './ProposalErrorBoundary';
+export type { ProposalErrorBoundaryProps, ProposalErrorFallbackProps } from './ProposalErrorBoundary';
 
 // Error Fallback Components
 export { ErrorFallback } from './ErrorFallback';
@@ -9,9 +11,13 @@ export { ConnectionStatusFallback } from './ConnectionStatusFallback';
 export { HeaderFallback } from './HeaderFallback';
 export { MainContentFallback } from './MainContentFallback';
 export { SidebarFallback } from './SidebarFallback';
+export { default as ProposalButtonFallback } from './ProposalButtonFallback';
+export type { ProposalButtonFallbackProps } from './ProposalButtonFallback';
 
 // Error Recovery Components
 export { default as ErrorRecoveryPanel } from './ErrorRecoveryPanel';
+export { default as ProposalDiagnosticPanel } from './ProposalDiagnosticPanel';
+export type { ProposalDiagnosticPanelProps } from './ProposalDiagnosticPanel';
 
 // Error Monitoring Components
 export { default as ErrorMonitoringDashboard } from './ErrorMonitoringDashboard';

@@ -2,6 +2,13 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 import { Rate } from 'k6/metrics';
 
+// Import centralized wallet configuration
+const WALLET_CONFIG = {
+  PRIMARY_TESTNET_ACCOUNT: '0.0.6199687',
+  SECONDARY_TESTNET_ACCOUNT: '0.0.6199688',
+  TERTIARY_TESTNET_ACCOUNT: '0.0.6199689', // For third test user
+};
+
 // Custom metrics
 const errorRate = new Rate('errors');
 
@@ -27,9 +34,9 @@ const BASE_URL = 'http://localhost:3001';
 
 // Test data
 const testUsers = [
-  { id: 'user1', walletAddress: '0.0.123456' },
-  { id: 'user2', walletAddress: '0.0.789012' },
-  { id: 'user3', walletAddress: '0.0.345678' },
+  { id: 'user1', walletAddress: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT },
+  { id: 'user2', walletAddress: WALLET_CONFIG.SECONDARY_TESTNET_ACCOUNT },
+  { id: 'user3', walletAddress: WALLET_CONFIG.TERTIARY_TESTNET_ACCOUNT },
 ];
 
 const testBookings = [
@@ -139,7 +146,7 @@ function testSearchBookings(headers) {
 
 function testCreateBooking(headers) {
   const booking = testBookings[Math.floor(Math.random() * testBookings.length)];
-  
+
   // Add random suffix to avoid conflicts
   booking.confirmationNumber += '-' + Math.random().toString(36).substr(2, 9);
 
@@ -220,7 +227,7 @@ function testBlockchainOperations(headers) {
     const txId = blockchainResponse.json('transactionId');
     if (txId) {
       const verifyResponse = http.get(`${BASE_URL}/api/blockchain/transactions/${txId}`, { headers });
-      
+
       check(verifyResponse, {
         'transaction verification response time < 1s': (r) => r.timings.duration < 1000,
       }) || errorRate.add(1);

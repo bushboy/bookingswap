@@ -9,6 +9,7 @@ import { PerformanceMonitorWrapper } from '@/components/debug/PerformanceMonitor
 import { ComponentErrorBoundary } from '@/components/error/ComponentErrorBoundary';
 import { AppErrorFallback } from '@/components/error/AppErrorFallback';
 import { enablePerformanceDevTools } from '@/utils/performanceOptimizations';
+import '@/utils/resetThrottling'; // Import throttling reset utilities for debugging
 
 function App() {
   // Enable performance dev tools in development

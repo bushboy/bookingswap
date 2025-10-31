@@ -86,3 +86,20 @@ export {
 // Targeting Error Handling
 export { TargetingDisplayErrorHandler } from './TargetingDisplayErrorHandler';
 export { TargetingValidationService } from './TargetingValidationService';
+
+// Completion Transaction Manager
+export { CompletionTransactionManager } from './CompletionTransactionManager';
+export type { CompletionTransactionResult } from './CompletionTransactionManager';
+
+// Completion Validation Service
+export { CompletionValidationService } from './CompletionValidationService';
+
+// Completion Rollback Manager
+export { CompletionRollbackManager } from './CompletionRollbackManager';
+
+// Swap Completion Orchestrator
+export { SwapCompletionOrchestrator } from './SwapCompletionOrchestrator';
+
+// Swap Completion Audit Services
+export { SwapCompletionAuditService } from './SwapCompletionAuditService';
+export { SwapCompletionAuditCleanupService } from './SwapCompletionAuditCleanupService';

@@ -1,6 +1,7 @@
 import { apiClient } from './apiClient';
 import { logger } from '@/utils/logger';
 import { ProposalErrorHandler } from './proposalErrorHandler';
+import { SwapCompletionResult, CompletionValidationResult, SwapCompletionErrorCodes } from '@booking-swap/shared';
 
 /**
  * Request interface for accepting a proposal
@@ -10,6 +11,8 @@ export interface AcceptProposalRequest {
     userId: string;
     autoProcessPayment?: boolean;
     swapTargetId?: string; // Target swap ID for booking proposals
+    ensureCompletion?: boolean; // New flag for completion workflow
+    validationLevel?: 'basic' | 'comprehensive'; // New validation option
 }
 
 /**
@@ -48,6 +51,8 @@ export interface ProposalActionResponse {
         transactionId: string;
         consensusTimestamp?: string;
     };
+    completion?: SwapCompletionResult; // New completion details
+    validation?: CompletionValidationResult; // New validation results
 }
 
 /**
@@ -61,6 +66,8 @@ export interface ProposalStatusResponse {
     rejectionReason?: string;
     paymentStatus?: 'processing' | 'completed' | 'failed';
     blockchainTransactionId?: string;
+    completionStatus?: 'initiated' | 'completed' | 'failed' | 'rolled_back'; // New completion status
+    completionId?: string; // New completion tracking ID
 }
 
 /**
@@ -100,24 +107,43 @@ export class ProposalAcceptanceAPI {
             'TIMEOUT',
             'INTERNAL_SERVER_ERROR',
             'SERVICE_UNAVAILABLE',
-            'BLOCKCHAIN_RECORDING_FAILED'
+            'BLOCKCHAIN_RECORDING_FAILED',
+            'DATABASE_TRANSACTION_FAILED',
+            'COMPLETION_VALIDATION_FAILED'
         ]
     };
 
     /**
      * Accept a proposal with comprehensive error handling and retry logic
-     * Requirements: 1.3, 1.4
+     * Enhanced with completion workflow support
+     * Requirements: 1.1, 1.3, 1.4, 4.1, 8.1
      */
     async acceptProposal(request: AcceptProposalRequest): Promise<ProposalActionResponse> {
-        const { proposalId, userId, autoProcessPayment = true, swapTargetId } = request;
+        const {
+            proposalId,
+            userId,
+            autoProcessPayment = true,
+            swapTargetId,
+            ensureCompletion = true,
+            validationLevel = 'basic'
+        } = request;
 
-        logger.info('Accepting proposal', { proposalId, userId, autoProcessPayment, swapTargetId });
+        logger.info('Accepting proposal with completion workflow', {
+            proposalId,
+            userId,
+            autoProcessPayment,
+            swapTargetId,
+            ensureCompletion,
+            validationLevel
+        });
 
         return this.executeWithRetry(async () => {
             try {
                 const requestBody: any = {
                     userId,
-                    autoProcessPayment
+                    autoProcessPayment,
+                    ensureCompletion,
+                    validationLevel
                 };
 
                 // Use swapTargetId as the URL parameter if provided (it's the correct ID for booking proposals)
@@ -129,11 +155,13 @@ export class ProposalAcceptanceAPI {
                     requestBody.swapTargetId = swapTargetId;
                 }
 
-                logger.info('Using URL proposal ID', {
+                logger.info('Using URL proposal ID with completion workflow', {
                     originalProposalId: proposalId,
                     swapTargetId,
                     urlProposalId,
-                    usingSwapTargetIdInUrl: !!swapTargetId
+                    usingSwapTargetIdInUrl: !!swapTargetId,
+                    ensureCompletion,
+                    validationLevel
                 });
 
                 const response = await apiClient.post<ProposalActionResponse>(
@@ -141,19 +169,29 @@ export class ProposalAcceptanceAPI {
                     requestBody
                 );
 
-                logger.info('Proposal accepted successfully', {
+                logger.info('Proposal accepted successfully with completion', {
                     proposalId,
                     status: response.data.proposal.status,
-                    hasPayment: !!response.data.paymentTransaction
+                    hasPayment: !!response.data.paymentTransaction,
+                    hasCompletion: !!response.data.completion,
+                    completionValid: response.data.validation?.isValid,
+                    completedSwaps: response.data.completion?.completedSwaps?.length || 0,
+                    updatedBookings: response.data.completion?.updatedBookings?.length || 0
                 });
+
+                // Start completion status polling if completion is in progress
+                if (response.data.completion && ensureCompletion) {
+                    this.startCompletionStatusPolling(proposalId, response.data.completion);
+                }
 
                 return response.data;
             } catch (error: any) {
-                logger.error('Failed to accept proposal', {
+                logger.error('Failed to accept proposal with completion', {
                     proposalId,
                     error: error.message,
                     status: error.response?.status,
-                    data: error.response?.data
+                    data: error.response?.data,
+                    isCompletionError: this.isCompletionError(error)
                 });
 
                 throw this.handleApiError(error);
@@ -289,17 +327,138 @@ export class ProposalAcceptanceAPI {
     }
 
     /**
-     * Check if an error is retryable using enhanced error handler
+     * Check if an error is retryable using enhanced error handler with completion support
+     * Requirements: 4.1, 8.1
      */
     private isRetryableError(error: any): boolean {
+        // Check completion-specific retryable errors first
+        const errorCode = error.response?.data?.error?.code || error.code;
+
+        if (this.retryConfig.retryableErrors.includes(errorCode)) {
+            return true;
+        }
+
+        // Use existing error handler for other cases
         return ProposalErrorHandler.isRetryableError(error);
     }
 
+
+
     /**
-     * Handle API errors using enhanced error handler
+     * Start completion status polling for long-running operations
+     * Requirements: 1.1, 4.1
+     */
+    private startCompletionStatusPolling(proposalId: string, completion: SwapCompletionResult): void {
+        const pollInterval = 2000; // 2 seconds
+        const maxPollTime = 30000; // 30 seconds
+        const startTime = Date.now();
+
+        logger.debug('Starting completion status polling', {
+            proposalId,
+            completedSwaps: completion.completedSwaps.length,
+            updatedBookings: completion.updatedBookings.length,
+            completionTimestamp: completion.completionTimestamp
+        });
+
+        const poll = async () => {
+            try {
+                if (Date.now() - startTime > maxPollTime) {
+                    logger.warn('Completion status polling timeout', { proposalId });
+                    return;
+                }
+
+                const status = await this.getProposalStatus(proposalId);
+
+                logger.debug('Completion status poll result', {
+                    proposalId,
+                    completionStatus: status.completionStatus,
+                    paymentStatus: status.paymentStatus
+                });
+
+                if (status.completionStatus === 'completed') {
+                    logger.info('Completion workflow finished successfully', { proposalId });
+                    return;
+                } else if (status.completionStatus === 'failed' || status.completionStatus === 'rolled_back') {
+                    logger.error('Completion workflow failed', {
+                        proposalId,
+                        completionStatus: status.completionStatus
+                    });
+                    return;
+                }
+
+                // Continue polling if still in progress
+                if (status.completionStatus === 'initiated') {
+                    setTimeout(poll, pollInterval);
+                }
+            } catch (error: any) {
+                logger.error('Error during completion status polling', {
+                    proposalId,
+                    error: error.message
+                });
+            }
+        };
+
+        // Start polling after a short delay
+        setTimeout(poll, pollInterval);
+    }
+
+    /**
+     * Check if an error is completion-related
+     * Requirements: 4.1, 8.1
+     */
+    private isCompletionError(error: any): boolean {
+        const errorCode = error.response?.data?.error?.code || error.code;
+
+        const completionErrorCodes = [
+            SwapCompletionErrorCodes.COMPLETION_VALIDATION_FAILED,
+            SwapCompletionErrorCodes.DATABASE_TRANSACTION_FAILED,
+            SwapCompletionErrorCodes.BLOCKCHAIN_RECORDING_FAILED,
+            SwapCompletionErrorCodes.INCONSISTENT_ENTITY_STATES,
+            SwapCompletionErrorCodes.AUTOMATIC_CORRECTION_FAILED,
+            SwapCompletionErrorCodes.ROLLBACK_FAILED
+        ];
+
+        return completionErrorCodes.includes(errorCode);
+    }
+
+    /**
+     * Enhanced error handling for completion-specific error codes
+     * Requirements: 4.1, 8.1
      */
     private handleApiError(error: any): Error {
         const enhancedError = ProposalErrorHandler.handleApiError(error);
+        const errorCode = error.response?.data?.error?.code || error.code;
+
+        // Handle completion-specific errors
+        if (this.isCompletionError(error)) {
+            switch (errorCode) {
+                case SwapCompletionErrorCodes.COMPLETION_VALIDATION_FAILED:
+                    enhancedError.message = 'Completion validation failed. Some entities may be in an inconsistent state.';
+                    enhancedError.userAction = 'Please check the status of your swaps and bookings, then try again.';
+                    break;
+                case SwapCompletionErrorCodes.DATABASE_TRANSACTION_FAILED:
+                    enhancedError.message = 'Database transaction failed during completion. Please try again.';
+                    enhancedError.shouldRetry = true;
+                    enhancedError.retryDelay = 3000;
+                    break;
+                case SwapCompletionErrorCodes.BLOCKCHAIN_RECORDING_FAILED:
+                    enhancedError.message = 'Blockchain recording failed. The operation may be retried automatically.';
+                    enhancedError.shouldRetry = true;
+                    enhancedError.retryDelay = 5000;
+                    break;
+                case SwapCompletionErrorCodes.INCONSISTENT_ENTITY_STATES:
+                    enhancedError.message = 'Inconsistent entity states detected. Manual intervention may be required.';
+                    enhancedError.shouldRetry = false;
+                    enhancedError.userAction = 'Please contact support for assistance with this completion issue.';
+                    break;
+                case SwapCompletionErrorCodes.ROLLBACK_FAILED:
+                    enhancedError.message = 'Completion rollback failed. Please contact support immediately.';
+                    enhancedError.shouldRetry = false;
+                    enhancedError.userAction = 'Contact support immediately - manual intervention required.';
+                    break;
+            }
+        }
+
         const apiError = new Error(enhancedError.message);
 
         // Attach additional error information
@@ -308,6 +467,7 @@ export class ProposalAcceptanceAPI {
         (apiError as any).shouldRedirectToLogin = enhancedError.shouldRedirectToLogin;
         (apiError as any).userAction = enhancedError.userAction;
         (apiError as any).retryDelay = enhancedError.retryDelay;
+        (apiError as any).isCompletionError = this.isCompletionError(error);
 
         return apiError;
     }

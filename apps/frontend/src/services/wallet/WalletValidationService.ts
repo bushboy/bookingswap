@@ -455,7 +455,7 @@ export class WalletValidationService {
         const mockAccountPattern = /^\d+$/; // Simple numeric IDs for mocks
 
         return hederaAccountPattern.test(accountId) ||
-            (process.env.NODE_ENV !== 'production' && mockAccountPattern.test(accountId));
+            (!import.meta.env.PROD && mockAccountPattern.test(accountId));
     }
 
     /**

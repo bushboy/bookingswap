@@ -1,5 +1,12 @@
 import { Page } from '@playwright/test';
 import { mockHederaResponses, testUsers, testBookings } from './test-data';
+import {
+  WALLET_CONFIG,
+  createMockWalletResponse,
+  createMockAccountInfo,
+  createMockWalletWithPrivateKey,
+  createMockTransactionId
+} from '../../fixtures/wallet-config';
 
 export class MockServices {
   constructor(private page: Page) {
@@ -80,22 +87,60 @@ export class MockServices {
   }
 
   async mockWalletConnection() {
-    // Mock Hedera Wallet Connect
-    await this.page.addInitScript(() => {
+    // Mock Hedera Wallet Connect using centralized configuration
+    await this.page.addInitScript((walletConfig) => {
       // @ts-ignore
       window.hederaWallet = {
         connect: async () => ({
-          accountId: '0.0.123456',
+          accountId: walletConfig.PRIMARY_TESTNET_ACCOUNT,
           publicKey: 'mock-public-key',
         }),
         signTransaction: async (transaction: any) => ({
           signature: 'mock-signature',
-          transactionId: 'mock-tx-id',
+          transactionId: walletConfig.TRANSACTION_ID_PREFIX + Date.now() + '.123456789',
         }),
-        disconnect: async () => {},
+        disconnect: async () => { },
         isConnected: () => true,
       };
-    });
+
+      // Mock HashPack wallet
+      // @ts-ignore
+      window.hashpack = {
+        isAvailable: true,
+        connect: async () => ({
+          accountIds: [walletConfig.PRIMARY_TESTNET_ACCOUNT],
+          network: walletConfig.NETWORK,
+        }),
+        getAccountInfo: async () => ({
+          accountId: walletConfig.PRIMARY_TESTNET_ACCOUNT,
+          balance: { hbars: walletConfig.DEFAULT_BALANCE },
+        }),
+        signTransaction: async (transaction: any) => ({
+          signature: 'mock-signature',
+          transactionId: walletConfig.TRANSACTION_ID_PREFIX + Date.now() + '.123456789',
+        }),
+        disconnect: async () => { },
+      };
+
+      // Mock Blade wallet
+      // @ts-ignore
+      window.bladeWallet = {
+        isAvailable: true,
+        connect: async () => ({
+          accountIds: [walletConfig.PRIMARY_TESTNET_ACCOUNT],
+          network: walletConfig.NETWORK,
+        }),
+        getAccountInfo: async () => ({
+          accountId: walletConfig.PRIMARY_TESTNET_ACCOUNT,
+          balance: { hbars: walletConfig.DEFAULT_BALANCE },
+        }),
+        signTransaction: async (transaction: any) => ({
+          signature: 'mock-signature',
+          transactionId: walletConfig.TRANSACTION_ID_PREFIX + Date.now() + '.123456789',
+        }),
+        disconnect: async () => { },
+      };
+    }, WALLET_CONFIG);
   }
 
   async setupTestDatabase() {

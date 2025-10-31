@@ -55,9 +55,9 @@ export interface FeatureFlagServiceConfig {
  */
 const DEFAULT_CONFIG: FeatureFlagServiceConfig = {
     autoSanitize: true,
-    validateCompatibility: process.env.NODE_ENV === 'development',
-    enableLogging: process.env.NODE_ENV === 'development',
-    apiBaseUrl: process.env.VITE_API_BASE_URL || '/api',
+    validateCompatibility: import.meta.env.DEV,
+    enableLogging: import.meta.env.DEV,
+    apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '/api',
     onFeatureFlagError: (error, context) => {
         console.error(`Feature flag error in ${context}:`, error);
     },

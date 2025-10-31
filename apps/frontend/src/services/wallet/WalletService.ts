@@ -29,8 +29,8 @@ export class WalletService {
   private currentProvider: WalletProvider | null = null;
   private listeners: Map<string, Function[]> = new Map();
   private networkValidator: NetworkValidator;
-  private availabilityCache: Map<string, { result: boolean; timestamp: number }> = new Map();
-  private readonly AVAILABILITY_CACHE_DURATION = 5000; // 5 seconds
+  private isInitialized: boolean = false;
+  private initializationTimestamp: number = 0;
 
   constructor() {
     this.networkValidator = new NetworkValidator(defaultNetworkConfig);
@@ -60,6 +60,10 @@ export class WalletService {
     }
 
     this.providers.set(provider.id, provider);
+
+    // Log provider registration for debugging
+    console.log(`✓ Wallet provider registered: ${provider.id} (${provider.name})`);
+    console.log(`Total providers registered: ${this.providers.size}`);
 
     // Set up provider event listeners
     if (
@@ -143,148 +147,37 @@ export class WalletService {
   }
 
   /**
-   * Get available providers (those that are installed/accessible)
+   * Get all registered providers (simplified - no availability checking)
    */
-  public async getAvailableProviders(): Promise<WalletProvider[]> {
-    const providers = this.getProviders();
-    const availableProviders: WalletProvider[] = [];
-
-    // Use Promise.allSettled for better error handling and parallel execution
-    const availabilityChecks = await Promise.allSettled(
-      providers.map(async (provider) => {
-        try {
-          // Use cached availability if available for Kabila
-          const isAvailable = await this.checkProviderAvailabilityWithCache(provider);
-          return { provider, isAvailable };
-        } catch (error) {
-          console.warn(
-            `Error checking availability for provider ${provider.id}:`,
-            error
-          );
-          return { provider, isAvailable: false };
-        }
-      })
-    );
-
-    // Process results
-    for (const result of availabilityChecks) {
-      if (result.status === 'fulfilled' && result.value.isAvailable) {
-        availableProviders.push(result.value.provider);
-      } else if (result.status === 'rejected') {
-        console.warn('Provider availability check failed:', result.reason);
-      }
-    }
-
-    return availableProviders;
+  public getAvailableProviders(): WalletProvider[] {
+    return this.getProviders();
   }
 
   /**
-   * Get provider availability status for all registered providers
+   * Get provider availability status (simplified - returns all as unknown)
    */
-  public async getProviderAvailabilityStatus(): Promise<Map<string, boolean>> {
+  public getProviderAvailabilityStatus(): Map<string, boolean> {
     const providers = this.getProviders();
     const availabilityStatus = new Map<string, boolean>();
 
-    // Use Promise.allSettled for better error handling
-    const statusChecks = await Promise.allSettled(
-      providers.map(async provider => {
-        try {
-          const isAvailable = await this.checkProviderAvailabilityWithCache(provider);
-          return { providerId: provider.id, isAvailable };
-        } catch (error) {
-          console.warn(
-            `Error checking availability for provider ${provider.id}:`,
-            error
-          );
-          return { providerId: provider.id, isAvailable: false };
-        }
-      })
-    );
-
-    // Process results
-    for (const result of statusChecks) {
-      if (result.status === 'fulfilled') {
-        availabilityStatus.set(result.value.providerId, result.value.isAvailable);
-      } else {
-        console.warn('Provider availability status check failed:', result.reason);
-      }
-    }
+    // Return all providers as available (detection happens on connection)
+    providers.forEach(provider => {
+      availabilityStatus.set(provider.id, true);
+    });
 
     return availabilityStatus;
   }
 
   /**
-   * Check if a specific provider is available
+   * Check if a specific provider is registered (simplified)
    */
-  public async isProviderAvailable(providerId: string): Promise<boolean> {
-    const provider = this.providers.get(providerId);
-    if (!provider) {
-      return false;
-    }
-
-    try {
-      return await this.checkProviderAvailabilityWithCache(provider);
-    } catch (error) {
-      console.warn(
-        `Error checking availability for provider ${providerId}:`,
-        error
-      );
-      return false;
-    }
+  public isProviderAvailable(providerId: string): boolean {
+    return this.providers.has(providerId);
   }
 
-  /**
-   * Check provider availability with caching mechanism
-   */
-  private async checkProviderAvailabilityWithCache(provider: WalletProvider): Promise<boolean> {
-    const now = Date.now();
-    const cached = this.availabilityCache.get(provider.id);
 
-    // Return cached result if still valid
-    if (cached && (now - cached.timestamp) < this.AVAILABILITY_CACHE_DURATION) {
-      return cached.result;
-    }
 
-    try {
-      // For Kabila adapter, use enhanced availability detection
-      let isAvailable: boolean;
 
-      if (provider.id === 'kabila') {
-        // Call the enhanced isAvailable method which includes retry logic
-        isAvailable = await provider.isAvailable();
-      } else {
-        // For other providers, use standard availability check
-        isAvailable = await provider.isAvailable();
-      }
-
-      // Cache the result
-      this.availabilityCache.set(provider.id, {
-        result: isAvailable,
-        timestamp: now
-      });
-
-      return isAvailable;
-    } catch (error) {
-      // Cache negative result for shorter duration on error
-      this.availabilityCache.set(provider.id, {
-        result: false,
-        timestamp: now
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Clear availability cache for a specific provider or all providers
-   */
-  public clearAvailabilityCache(providerId?: string): void {
-    if (providerId) {
-      this.availabilityCache.delete(providerId);
-    } else {
-      this.availabilityCache.clear();
-    }
-  }
 
   /**
    * Get a specific provider by ID
@@ -316,11 +209,8 @@ export class WalletService {
 
     try {
       return await retryHandler(async () => {
-        // Clear availability cache for this provider to ensure fresh check
-        this.clearAvailabilityCache(providerId);
-
-        // Check if provider is available with enhanced detection
-        const isAvailable = await this.checkProviderAvailabilityWithCache(provider);
+        // Check if provider is available (simplified check on connection)
+        const isAvailable = await provider.isAvailable();
         if (!isAvailable) {
           throw WalletErrorHandler.handleProviderError(
             new Error(`${provider.name} is not installed or available`),
@@ -458,8 +348,7 @@ export class WalletService {
       this.currentProvider = null;
       this.clearConnectionData();
 
-      // Clear availability cache for this provider
-      this.clearAvailabilityCache(providerId);
+
 
       // Emit disconnection events
       this.emit('disconnect');
@@ -660,14 +549,24 @@ export class WalletService {
         }
       }
 
-      // Standard restoration flow
-      const isAvailable = await this.checkProviderAvailabilityWithCache(provider);
-      if (!isAvailable) {
-        console.warn(`Provider ${providerId} is not available`);
+      // Standard restoration flow (simplified availability check)
+      try {
+        const isAvailable = await provider.isAvailable();
+        if (!isAvailable) {
+          console.warn(`Provider ${providerId} is not available`);
+          this.clearConnectionData();
+          this.emit('connectionRestorationFailed', {
+            providerId,
+            reason: 'provider_not_available'
+          });
+          return false;
+        }
+      } catch (error) {
+        console.warn(`Provider ${providerId} availability check failed:`, error);
         this.clearConnectionData();
         this.emit('connectionRestorationFailed', {
           providerId,
-          reason: 'provider_not_available'
+          reason: 'availability_check_failed'
         });
         return false;
       }
@@ -744,7 +643,7 @@ export class WalletService {
 
       // Fallback to standard restoration if adapter doesn't have custom method
       try {
-        const isAvailable = await this.checkProviderAvailabilityWithCache(provider);
+        const isAvailable = await provider.isAvailable();
         if (isAvailable) {
           const restoredConnection = await provider.connect();
           this.currentProvider = provider;
@@ -1004,10 +903,10 @@ export class WalletService {
   }
 
   /**
-   * Refresh provider availability and emit events for changes
+   * Refresh provider availability (simplified - just emit current providers)
    */
-  public async refreshProviderAvailability(): Promise<void> {
-    const availabilityStatus = await this.getProviderAvailabilityStatus();
+  public refreshProviderAvailability(): void {
+    const availabilityStatus = this.getProviderAvailabilityStatus();
     const availableProviders = Array.from(availabilityStatus.entries())
       .filter(([_, isAvailable]) => isAvailable)
       .map(([providerId, _]) => providerId);
@@ -1401,44 +1300,21 @@ export class WalletService {
   }
 
   /**
-   * Force refresh of provider availability status
-   * Useful for Kabila when extension state might have changed
+   * Force refresh of provider availability (simplified - just emit event)
    */
-  public async forceRefreshProviderAvailability(providerId?: string): Promise<void> {
-    if (providerId) {
-      // Clear cache for specific provider
-      this.clearAvailabilityCache(providerId);
-
-      // For Kabila, also clear its internal cache
-      const provider = this.getProvider(providerId);
-      if (provider && providerId === 'kabila' && 'clearAvailabilityCache' in provider) {
-        (provider as any).clearAvailabilityCache();
-      }
-    } else {
-      // Clear all caches
-      this.clearAvailabilityCache();
-
-      // Clear Kabila's internal cache if it exists
-      const kabilaProvider = this.getProvider('kabila');
-      if (kabilaProvider && 'clearAvailabilityCache' in kabilaProvider) {
-        (kabilaProvider as any).clearAvailabilityCache();
-      }
-    }
-
+  public forceRefreshProviderAvailability(providerId?: string): void {
     // Emit refresh event
     this.emit('providerAvailabilityRefreshed', { providerId });
   }
 
   /**
-   * Get detailed provider status including diagnostics for Kabila
+   * Get detailed provider status (simplified)
    */
-  public async getDetailedProviderStatus(providerId: string): Promise<{
+  public getDetailedProviderStatus(providerId: string): {
     isRegistered: boolean;
     isAvailable: boolean;
     isConnected: boolean;
-    diagnostics?: any;
-    lastError?: string;
-  }> {
+  } {
     const provider = this.getProvider(providerId);
 
     if (!provider) {
@@ -1449,41 +1325,11 @@ export class WalletService {
       };
     }
 
-    try {
-      const isAvailable = await this.checkProviderAvailabilityWithCache(provider);
-      const isConnected = this.currentProvider?.id === providerId && this.isConnected();
-
-      const status = {
-        isRegistered: true,
-        isAvailable,
-        isConnected
-      };
-
-      // Get Kabila-specific diagnostics if available
-      if (providerId === 'kabila' && 'getDiagnostics' in provider) {
-        try {
-          const diagnostics = (provider as any).getDiagnostics();
-          return {
-            ...status,
-            diagnostics
-          };
-        } catch (error) {
-          return {
-            ...status,
-            lastError: error instanceof Error ? error.message : 'Failed to get diagnostics'
-          };
-        }
-      }
-
-      return status;
-    } catch (error) {
-      return {
-        isRegistered: true,
-        isAvailable: false,
-        isConnected: false,
-        lastError: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
+    return {
+      isRegistered: true,
+      isAvailable: true, // Assume available, check on connection
+      isConnected: this.currentProvider?.id === providerId && this.isConnected()
+    };
   }
 
   /**
@@ -1493,6 +1339,64 @@ export class WalletService {
     // In a real implementation, this would track the last error
     // For now, return null as errors are handled via events
     return null;
+  }
+
+  /**
+   * Mark service as initialized
+   */
+  public markAsInitialized(): void {
+    this.isInitialized = true;
+    this.initializationTimestamp = Date.now();
+    console.log(`✓ WalletService marked as initialized with ${this.providers.size} providers`);
+  }
+
+  /**
+   * Get initialization status
+   */
+  public getInitializationStatus(): {
+    isInitialized: boolean;
+    providerCount: number;
+    timestamp: number;
+    providers: string[];
+  } {
+    return {
+      isInitialized: this.isInitialized,
+      providerCount: this.providers.size,
+      timestamp: this.initializationTimestamp,
+      providers: Array.from(this.providers.keys()),
+    };
+  }
+
+  /**
+   * Validate service state for debugging
+   */
+  public validateServiceState(): {
+    isReady: boolean;
+    issues: string[];
+    status: any;
+  } {
+    const issues: string[] = [];
+
+    if (!this.isInitialized) {
+      issues.push('Service not marked as initialized');
+    }
+
+    if (this.providers.size === 0) {
+      issues.push('No providers registered');
+    }
+
+    const status = {
+      initialized: this.isInitialized,
+      providerCount: this.providers.size,
+      providers: Array.from(this.providers.keys()),
+      timestamp: this.initializationTimestamp,
+    };
+
+    return {
+      isReady: issues.length === 0,
+      issues,
+      status,
+    };
   }
 }
 

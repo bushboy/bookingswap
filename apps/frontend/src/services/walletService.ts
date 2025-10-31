@@ -1,4 +1,5 @@
 import { HederaWalletConnect } from '@hashgraph/hedera-wallet-connect';
+import { WALLET_CONFIG } from '../config/wallet';
 
 export interface WalletAccount {
   accountId: string;
@@ -27,7 +28,7 @@ class WalletService {
         connect: async () => ({
           namespaces: {
             hedera: {
-              accounts: ['hedera:testnet:0.0.123456'],
+              accounts: [`hedera:${WALLET_CONFIG.NETWORK}:${WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT}`],
             },
           },
         }),

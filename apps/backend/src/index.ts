@@ -47,10 +47,12 @@ import { UserController } from './controllers/UserController';
 import { BookingController } from './controllers/BookingController';
 import { SwapController } from './controllers/SwapController';
 import { ProposalController } from './controllers/ProposalController';
+import { CompletionController } from './controllers/CompletionController';
 import { NotificationController } from './controllers/NotificationController';
 
 import { BookingServiceFactory } from './services/booking/factory';
-import { createSwapProposalService, createSwapResponseService, createProposalAcceptanceService, createSwapExpirationService } from './services/swap/factory';
+import { createSwapProposalService, createSwapResponseService, createProposalAcceptanceService, createSwapExpirationService, createSwapCompletionOrchestrator } from './services/swap/factory';
+import { CompletionValidationService } from './services/swap/CompletionValidationService';
 import { SwapExpirationService } from './services/swap/SwapExpirationService';
 import { SwapMatchingService } from './services/swap/SwapMatchingService';
 import { SwapTargetingService } from './services/swap/SwapTargetingService';
@@ -68,6 +70,8 @@ import { createUserRoutes } from './routes/users';
 import { createBookingRoutes } from './routes/bookings';
 import { createSwapRoutes } from './routes/swaps';
 import { createProposalRoutes, createUserProposalRoutes } from './routes/proposals';
+import { createCompletionRoutes } from './routes/completions';
+import completionAuditRoutes from './routes/completionAudit';
 import { createTargetingRoutes } from './routes/targeting';
 import { createAuctionRoutes } from './routes/auctions';
 import { createPaymentRoutes } from './routes/payments';
@@ -430,6 +434,14 @@ async function createApp() {
     paymentService
   );
 
+  // Initialize completion services
+  const completionOrchestrator = createSwapCompletionOrchestrator(
+    dbPool,
+    hederaService,
+    notificationService
+  );
+  const completionValidationService = new CompletionValidationService(dbPool);
+
   // Initialize Hedera balance service
   const hederaBalanceService = new HederaBalanceService(hederaService);
 
@@ -445,7 +457,8 @@ async function createApp() {
   );
   const bookingController = new BookingController(bookingService, swapRepository);
   const swapController = new SwapController(swapProposalService, swapResponseService, swapMatchingService, swapTargetingService, swapRepository, auctionService, paymentService, swapOfferWorkflowService, hederaBalanceService, balanceCalculator, performanceMonitor);
-  const proposalController = new ProposalController(proposalAcceptanceService, swapRepository);
+  const proposalController = new ProposalController(proposalAcceptanceService, swapRepository, completionOrchestrator, completionValidationService);
+  const completionController = new CompletionController(completionOrchestrator, completionValidationService, swapRepository);
   const swapTargetingController = new SwapTargetingController(swapTargetingService);
   const notificationController = new NotificationController(notificationService);
 
@@ -473,8 +486,10 @@ async function createApp() {
   app.use('/api/auth', createAuthRoutes(authController, authMiddleware));
   app.use('/api/users', createUserRoutes(userController, authMiddleware));
   app.use('/api/bookings', createBookingRoutes(bookingController, authMiddleware));
-  app.use('/api/swaps', createSwapRoutes(swapController, authMiddleware));
+  app.use('/api/swaps', createSwapRoutes(swapController, authMiddleware, completionController));
   app.use('/api/proposals', createProposalRoutes(proposalController, authMiddleware));
+  app.use('/api/completions', createCompletionRoutes(completionController, authMiddleware));
+  app.use('/api/completions', completionAuditRoutes);
   app.use('/api/users', createUserProposalRoutes(proposalController, authMiddleware));
   app.use('/api', createTargetingRoutes(swapTargetingController, authMiddleware));
   app.use('/api/auctions', createAuctionRoutes(swapController, authMiddleware));

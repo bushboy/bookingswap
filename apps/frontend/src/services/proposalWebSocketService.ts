@@ -1,6 +1,12 @@
 import { EventEmitter } from 'events';
 import { realtimeService, RealtimeMessage } from './realtimeService';
 import { logger } from '@/utils/logger';
+import {
+    connectionThrottlingManager,
+    connectionStateChecker,
+    ConnectionThrottleConfig
+} from '@/utils/connectionThrottling';
+import { getServiceConfig, isThrottlingFeatureEnabled } from '@/config/connectionThrottling';
 
 /**
  * Proposal-specific WebSocket message types
@@ -75,6 +81,8 @@ export interface ProposalBlockchainUpdate {
  * Implements requirements 7.1, 7.2, 7.5 from the design document
  */
 export class ProposalWebSocketService extends EventEmitter {
+    private static readonly SERVICE_ID = 'proposalWebSocketService';
+
     private isInitialized: boolean = false;
     private subscribedProposals: Set<string> = new Set();
     private subscribedUsers: Set<string> = new Set();
@@ -82,9 +90,11 @@ export class ProposalWebSocketService extends EventEmitter {
     private connectionRetryCount: number = 0;
     private maxRetries: number = 5;
     private retryDelay: number = 2000;
+    private throttleConfig: ConnectionThrottleConfig;
 
     constructor() {
         super();
+        this.throttleConfig = getServiceConfig(ProposalWebSocketService.SERVICE_ID);
         this.initialize();
     }
 
@@ -114,16 +124,79 @@ export class ProposalWebSocketService extends EventEmitter {
     }
 
     /**
-     * Connect to proposal WebSocket updates with recovery
-     * Requirements: 7.5
+     * Connect to proposal WebSocket updates with throttling and recovery
+     * Requirements: 7.5, 1.2, 1.3, 2.1
      */
     public async connect(): Promise<void> {
+        // Check if throttling is enabled
+        if (!isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')) {
+            return this.connectDirect();
+        }
+
+        // Check connection state before attempting new connection
+        if (!connectionStateChecker.canConnect(ProposalWebSocketService.SERVICE_ID)) {
+            const status = connectionStateChecker.getConnectionStatus(ProposalWebSocketService.SERVICE_ID);
+
+            if (status.isConnected) {
+                logger.debug('ProposalWebSocketService already connected, skipping connection attempt');
+                return;
+            }
+
+            if (status.throttlingStatus.isPending) {
+                logger.debug('ProposalWebSocketService connection already pending, skipping duplicate attempt');
+                return;
+            }
+
+            if (!status.canConnect) {
+                const nextAttempt = status.throttlingStatus.nextAllowedAttempt;
+                const message = nextAttempt
+                    ? `Connection throttled until ${new Date(nextAttempt).toISOString()}`
+                    : 'Connection throttled due to rate limiting or max retries';
+
+                logger.warn('ProposalWebSocketService connection attempt blocked by throttling', {
+                    attemptCount: status.throttlingStatus.attemptCount,
+                    attemptsInWindow: status.throttlingStatus.attemptsInWindow,
+                    nextAllowedAttempt: nextAttempt
+                });
+
+                throw new Error(message);
+            }
+        }
+
+        // Use throttled connection with debouncing
+        return connectionThrottlingManager.debounceConnection(
+            ProposalWebSocketService.SERVICE_ID,
+            () => this.connectDirect(),
+            this.throttleConfig.debounceDelay
+        );
+    }
+
+    /**
+     * Direct connection method without throttling (internal use)
+     * Requirements: 7.5
+     */
+    private async connectDirect(): Promise<void> {
         try {
+            // Set connecting state
+            connectionStateChecker.setConnectionState(ProposalWebSocketService.SERVICE_ID, false);
+
             await realtimeService.connect();
+
+            // Set connected state
+            connectionStateChecker.setConnectionState(ProposalWebSocketService.SERVICE_ID, true);
+
             this.connectionRetryCount = 0;
             this.emit('connected');
             logger.info('ProposalWebSocketService connected');
+
+            // Reset throttling tracking on successful connection
+            if (isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')) {
+                connectionThrottlingManager.resetConnectionTracking(ProposalWebSocketService.SERVICE_ID);
+            }
         } catch (error) {
+            // Set disconnected state
+            connectionStateChecker.setConnectionState(ProposalWebSocketService.SERVICE_ID, false);
+
             logger.error('Failed to connect ProposalWebSocketService', { error });
             this.emit('error', error);
             await this.handleConnectionError();
@@ -137,6 +210,15 @@ export class ProposalWebSocketService extends EventEmitter {
     public disconnect(): void {
         this.unsubscribeFromAll();
         realtimeService.disconnect();
+
+        // Update connection state
+        connectionStateChecker.setConnectionState(ProposalWebSocketService.SERVICE_ID, false);
+
+        // Clear any pending throttled connections
+        if (isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')) {
+            connectionThrottlingManager.clearDebounce(ProposalWebSocketService.SERVICE_ID);
+        }
+
         this.emit('disconnected');
         logger.info('ProposalWebSocketService disconnected');
     }
@@ -253,32 +335,62 @@ export class ProposalWebSocketService extends EventEmitter {
 
     /**
      * Check if connected to WebSocket
+     * Requirements: 2.1
      */
     public isConnected(): boolean {
-        return realtimeService.isConnected();
+        const realtimeConnected = realtimeService.isConnected();
+        const stateCheckerConnected = connectionStateChecker.isConnected(ProposalWebSocketService.SERVICE_ID);
+
+        // Sync connection states if they differ
+        if (realtimeConnected !== stateCheckerConnected) {
+            connectionStateChecker.setConnectionState(ProposalWebSocketService.SERVICE_ID, realtimeConnected);
+        }
+
+        return realtimeConnected;
     }
 
     /**
      * Get current subscription status
+     * Requirements: 2.1
      */
     public getSubscriptionStatus(): {
         proposals: string[];
         users: string[];
         currentUser: string | null;
         isConnected: boolean;
+        connectionStatus?: ReturnType<typeof connectionStateChecker.getConnectionStatus>;
     } {
-        return {
+        const status = {
             proposals: Array.from(this.subscribedProposals),
             users: Array.from(this.subscribedUsers),
             currentUser: this.currentUserId,
             isConnected: this.isConnected(),
         };
+
+        // Add throttling status if enabled
+        if (isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')) {
+            return {
+                ...status,
+                connectionStatus: connectionStateChecker.getConnectionStatus(ProposalWebSocketService.SERVICE_ID),
+            };
+        }
+
+        return status;
     }
 
     // Event handlers for connection management
     private handleConnection(): void {
         logger.info('Proposal WebSocket connected');
         this.connectionRetryCount = 0;
+
+        // Update connection state
+        connectionStateChecker.setConnectionState(ProposalWebSocketService.SERVICE_ID, true);
+
+        // Reset throttling tracking on successful connection
+        if (isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')) {
+            connectionThrottlingManager.resetConnectionTracking(ProposalWebSocketService.SERVICE_ID);
+        }
+
         this.emit('connected');
         this.resubscribeAll();
     }
@@ -288,6 +400,10 @@ export class ProposalWebSocketService extends EventEmitter {
             code: event.code,
             reason: event.reason
         });
+
+        // Update connection state
+        connectionStateChecker.setConnectionState(ProposalWebSocketService.SERVICE_ID, false);
+
         this.emit('disconnected', event);
 
         // Attempt to reconnect if not a clean disconnect
@@ -302,23 +418,39 @@ export class ProposalWebSocketService extends EventEmitter {
     }
 
     /**
-     * Handle connection errors with retry logic
-     * Requirements: 7.5
+     * Handle connection errors with retry logic and throttling
+     * Requirements: 7.5, 1.2, 1.3
      */
     private async handleConnectionError(): Promise<void> {
-        if (this.connectionRetryCount >= this.maxRetries) {
+        // Use throttling config for max retries if available
+        const maxRetries = isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')
+            ? this.throttleConfig.maxRetries
+            : this.maxRetries;
+
+        if (this.connectionRetryCount >= maxRetries) {
             logger.error('Max connection retries reached for ProposalWebSocketService');
             this.emit('max_retries_reached');
             return;
         }
 
         this.connectionRetryCount++;
-        const delay = this.retryDelay * Math.pow(2, this.connectionRetryCount - 1);
+
+        // Use throttling config for retry delay if available and exponential backoff is enabled
+        let delay = this.retryDelay;
+        if (isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')) {
+            delay = this.throttleConfig.retryDelay;
+            if (isThrottlingFeatureEnabled('ENABLE_EXPONENTIAL_BACKOFF')) {
+                delay = delay * Math.pow(2, this.connectionRetryCount - 1);
+            }
+        } else {
+            delay = delay * Math.pow(2, this.connectionRetryCount - 1);
+        }
 
         logger.info('Retrying proposal WebSocket connection', {
             attempt: this.connectionRetryCount,
-            maxRetries: this.maxRetries,
-            delay
+            maxRetries,
+            delay,
+            throttlingEnabled: isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')
         });
 
         setTimeout(async () => {
@@ -442,6 +574,39 @@ export class ProposalWebSocketService extends EventEmitter {
         }
 
         logger.info('Resubscribed to all proposal channels after reconnection');
+    }
+
+    /**
+     * Get throttling status for debugging and monitoring
+     * Requirements: 2.1
+     */
+    public getThrottlingStatus(): {
+        serviceId: string;
+        throttlingEnabled: boolean;
+        connectionStatus: ReturnType<typeof connectionStateChecker.getConnectionStatus>;
+        config: ConnectionThrottleConfig;
+    } | null {
+        if (!isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')) {
+            return null;
+        }
+
+        return {
+            serviceId: ProposalWebSocketService.SERVICE_ID,
+            throttlingEnabled: true,
+            connectionStatus: connectionStateChecker.getConnectionStatus(ProposalWebSocketService.SERVICE_ID),
+            config: this.throttleConfig,
+        };
+    }
+
+    /**
+     * Force reset throttling state (for debugging/testing)
+     * Requirements: 2.1
+     */
+    public resetThrottling(): void {
+        if (isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')) {
+            connectionStateChecker.resetConnectionState(ProposalWebSocketService.SERVICE_ID);
+            logger.info('ProposalWebSocketService throttling state reset');
+        }
     }
 }
 

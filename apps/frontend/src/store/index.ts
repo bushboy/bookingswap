@@ -12,10 +12,16 @@ import { proposalSlice } from './slices/proposalSlice';
 import { proposalAcceptanceSlice } from './slices/proposalAcceptanceSlice';
 import { eligibleSwapsSlice } from './slices/eligibleSwapsSlice';
 import { compatibilitySlice } from './slices/compatibilitySlice';
+import { completionSlice } from './slices/completionSlice';
 import targetingReducer from './slices/targetingSlice';
 import notificationReducer from './slices/notificationSlice';
 import { performanceMiddleware } from './optimizations/stateOptimizations';
 import { proposalWebSocketMiddleware } from './middleware/proposalWebSocketMiddleware';
+import { completionWebSocketMiddleware } from './middleware/completionWebSocketMiddleware';
+import {
+  serializationValidationMiddleware,
+  serializableCheckConfig
+} from './middleware/serializationMiddleware';
 
 export const store = configureStore({
   reducer: {
@@ -32,15 +38,19 @@ export const store = configureStore({
     proposalAcceptance: proposalAcceptanceSlice.reducer,
     eligibleSwaps: eligibleSwapsSlice.reducer,
     compatibility: compatibilitySlice.reducer,
+    completion: completionSlice.reducer,
     targeting: targetingReducer,
     notifications: notificationReducer,
   },
   middleware: getDefaultMiddleware =>
     getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
-      },
-    }).concat(performanceMiddleware, proposalWebSocketMiddleware),
+      serializableCheck: serializableCheckConfig,
+    }).concat(
+      serializationValidationMiddleware,
+      performanceMiddleware,
+      proposalWebSocketMiddleware,
+      completionWebSocketMiddleware
+    ),
 });
 
 export type RootState = ReturnType<typeof store.getState>;
@@ -54,9 +64,12 @@ export * from './thunks/combinedBookingSwapThunks';
 export * from './thunks/proposalThunks';
 export * from './thunks/proposalAcceptanceThunks';
 export * from './thunks/targetingThunks';
+export * from './thunks/completionThunks';
 
 // Export enhanced selectors
 export * from './selectors/enhancedBookingSelectors';
 export * from './selectors/separatedBookingSelectors';
 export * from './selectors/proposalSelectors';
 export * from './selectors/proposalAcceptanceSelectors';
+export * from './selectors/completionSelectors';
+export * from './selectors/authSelectors';

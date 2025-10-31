@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminService } from '../../services/adminService';
+import { WALLET_CONFIG } from '../../../tests/fixtures/wallet-config';
 
 interface User {
   id: string;
@@ -51,7 +52,7 @@ export const UserManagement: React.FC = () => {
       const mockUsers: User[] = [
         {
           id: '1',
-          walletAddress: '0.0.123456',
+          walletAddress: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT,
           profile: {
             displayName: 'John Doe',
             email: 'john@example.com',
@@ -291,11 +292,10 @@ export const UserManagement: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col space-y-1">
                       <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${user.isActive
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                          }`}
                       >
                         {user.isActive ? 'Active' : 'Inactive'}
                       </span>

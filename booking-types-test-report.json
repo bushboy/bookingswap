@@ -1,0 +1,178 @@
+{
+  "timestamp": "2025-10-25T02:43:51.602Z",
+  "apiBaseUrl": "http://localhost:3001/api",
+  "hasAuthToken": false,
+  "results": [
+    {
+      "type": "hotel",
+      "success": false,
+      "status": 401,
+      "data": {
+        "error": {
+          "code": "MISSING_TOKEN",
+          "message": "Authorization token is required",
+          "category": "authentication",
+          "timestamp": "2025-10-25T02:43:47.014Z",
+          "debugInfo": {
+            "step": "token_extraction",
+            "details": "Expected format: \"Authorization: Bearer <token>\", received: \"none\""
+          }
+        }
+      },
+      "error": "Request failed with status code 401"
+    },
+    {
+      "type": "vacation_rental",
+      "success": false,
+      "status": 401,
+      "data": {
+        "error": {
+          "code": "MISSING_TOKEN",
+          "message": "Authorization token is required",
+          "category": "authentication",
+          "timestamp": "2025-10-25T02:43:47.535Z",
+          "debugInfo": {
+            "step": "token_extraction",
+            "details": "Expected format: \"Authorization: Bearer <token>\", received: \"none\""
+          }
+        }
+      },
+      "error": "Request failed with status code 401"
+    },
+    {
+      "type": "resort",
+      "success": false,
+      "status": 401,
+      "data": {
+        "error": {
+          "code": "MISSING_TOKEN",
+          "message": "Authorization token is required",
+          "category": "authentication",
+          "timestamp": "2025-10-25T02:43:48.043Z",
+          "debugInfo": {
+            "step": "token_extraction",
+            "details": "Expected format: \"Authorization: Bearer <token>\", received: \"none\""
+          }
+        }
+      },
+      "error": "Request failed with status code 401"
+    },
+    {
+      "type": "hostel",
+      "success": false,
+      "status": 401,
+      "data": {
+        "error": {
+          "code": "MISSING_TOKEN",
+          "message": "Authorization token is required",
+          "category": "authentication",
+          "timestamp": "2025-10-25T02:43:48.548Z",
+          "debugInfo": {
+            "step": "token_extraction",
+            "details": "Expected format: \"Authorization: Bearer <token>\", received: \"none\""
+          }
+        }
+      },
+      "error": "Request failed with status code 401"
+    },
+    {
+      "type": "bnb",
+      "success": false,
+      "status": 401,
+      "data": {
+        "error": {
+          "code": "MISSING_TOKEN",
+          "message": "Authorization token is required",
+          "category": "authentication",
+          "timestamp": "2025-10-25T02:43:49.054Z",
+          "debugInfo": {
+            "step": "token_extraction",
+            "details": "Expected format: \"Authorization: Bearer <token>\", received: \"none\""
+          }
+        }
+      },
+      "error": "Request failed with status code 401"
+    },
+    {
+      "type": "flight",
+      "success": false,
+      "status": 401,
+      "data": {
+        "error": {
+          "code": "MISSING_TOKEN",
+          "message": "Authorization token is required",
+          "category": "authentication",
+          "timestamp": "2025-10-25T02:43:49.562Z",
+          "debugInfo": {
+            "step": "token_extraction",
+            "details": "Expected format: \"Authorization: Bearer <token>\", received: \"none\""
+          }
+        }
+      },
+      "error": "Request failed with status code 401"
+    },
+    {
+      "type": "event",
+      "success": false,
+      "status": 401,
+      "data": {
+        "error": {
+          "code": "MISSING_TOKEN",
+          "message": "Authorization token is required",
+          "category": "authentication",
+          "timestamp": "2025-10-25T02:43:50.076Z",
+          "debugInfo": {
+            "step": "token_extraction",
+            "details": "Expected format: \"Authorization: Bearer <token>\", received: \"none\""
+          }
+        }
+      },
+      "error": "Request failed with status code 401"
+    },
+    {
+      "type": "rental",
+      "success": false,
+      "status": 401,
+      "data": {
+        "error": {
+          "code": "MISSING_TOKEN",
+          "message": "Authorization token is required",
+          "category": "authentication",
+          "timestamp": "2025-10-25T02:43:50.583Z",
+          "debugInfo": {
+            "step": "token_extraction",
+            "details": "Expected format: \"Authorization: Bearer <token>\", received: \"none\""
+          }
+        }
+      },
+      "error": "Request failed with status code 401"
+    },
+    {
+      "type": "invalid_type",
+      "success": false,
+      "status": 401,
+      "data": {
+        "error": {
+          "code": "MISSING_TOKEN",
+          "message": "Authorization token is required",
+          "category": "authentication",
+          "timestamp": "2025-10-25T02:43:51.089Z",
+          "debugInfo": {
+            "step": "token_extraction",
+            "details": "Expected format: \"Authorization: Bearer <token>\", received: \"none\""
+          }
+        }
+      },
+      "error": "Request failed with status code 401"
+    }
+  ],
+  "summary": {
+    "total": 9,
+    "successful": 0,
+    "failed": 9,
+    "validTypesAccepted": 0,
+    "validTypesTotal": 5,
+    "invalidTypesRejected": 4,
+    "invalidTypesTotal": 4
+  }
+}

@@ -1,0 +1,95 @@
+# ZAP Scanning Rules Configuration
+# Format: Rule ID	Action	Description
+# Actions: IGNORE, WARN, FAIL
+
+# High Priority Security Rules
+10021	FAIL	X-Content-Type-Options Header Missing
+10020	FAIL	X-Frame-Options Header Missing
+10016	FAIL	Web Browser XSS Protection Not Enabled
+10035	FAIL	Strict-Transport-Security Header Missing
+10038	FAIL	Content Security Policy (CSP) Header Missing
+
+# Authentication and Session Management
+10040	FAIL	Secure Cookie Flag Missing
+10041	FAIL	HTTP Only Cookie Flag Missing
+10042	FAIL	Cookie Poisoning
+10043	FAIL	User Controllable JavaScript Event (XSS)
+
+# Input Validation
+40012	FAIL	Cross Site Scripting (Reflected)
+40013	FAIL	Cross Site Scripting (Persistent)
+40014	FAIL	Cross Site Scripting (Persistent) - Prime
+40016	FAIL	Cross Site Scripting (Persistent) - Spider
+40017	FAIL	Cross Site Scripting (Persistent) - OData
+40018	FAIL	SQL Injection
+40019	FAIL	SQL Injection - MySQL
+40020	FAIL	SQL Injection - Hypersonic SQL
+40021	FAIL	SQL Injection - Oracle
+40022	FAIL	SQL Injection - PostgreSQL
+40023	FAIL	Possible Username Enumeration
+40024	FAIL	SQL Injection - SQLite
+40025	FAIL	SQL Injection - Hypersonic SQL (Time Based)
+40026	FAIL	SQL Injection - PostgreSQL (Time Based)
+40027	FAIL	SQL Injection - MySQL (Time Based)
+40028	FAIL	SQL Injection - Oracle (Time Based)
+
+# Information Disclosure
+10049	FAIL	Storable and Cacheable Content
+10050	FAIL	Retrieved from Cache
+10051	FAIL	Relative Path Confusion
+10052	FAIL	X-ChromeLogger-Data (XCOLD) Header Information Leak
+10054	FAIL	Cookie Without SameSite Attribute
+10055	FAIL	CSP Scanner: Wildcard Directive
+10056	FAIL	CSP Scanner: Missing Sources
+10057	FAIL	Username Hash Found
+10061	FAIL	X-AspNet-Version Response Header
+10062	FAIL	PII Disclosure
+10063	FAIL	Feature Policy Header Not Set
+10096	FAIL	Timestamp Disclosure
+10097	FAIL	Hash Disclosure
+10098	FAIL	Cross-Domain Misconfiguration
+
+# Server Configuration
+10029	FAIL	Cacheability and Retrievability
+10030	FAIL	User Controllable Charset
+10031	FAIL	User Controllable HTML Element Attribute (Potential XSS)
+10032	FAIL	Viewstate Scanner
+10033	FAIL	Directory Browsing
+10034	FAIL	Heartbleed OpenSSL Vulnerability
+10036	FAIL	Server Leaks Version Information via "Server" HTTP Response Header Field
+10037	FAIL	Server Leaks Information via "X-Powered-By" HTTP Response Header Field(s)
+
+# API Security
+90001	FAIL	Insecure HTTP Method
+90002	FAIL	Private IP Disclosure
+90003	FAIL	Sub Resource Integrity Attribute Missing
+90004	FAIL	Insufficient Site Isolation Against Spectre Vulnerability
+90005	FAIL	Sec-Fetch-Dest Header is Missing
+90006	FAIL	Sec-Fetch-Site Header is Missing
+90007	FAIL	Sec-Fetch-User Header is Missing
+
+# Blockchain/Crypto Specific (Custom Rules)
+# These would need to be implemented as custom ZAP scripts
+# 99001	FAIL	Weak Cryptographic Hash
+# 99002	FAIL	Hardcoded Private Keys
+# 99003	FAIL	Insecure Random Number Generation
+# 99004	FAIL	Wallet Address Exposure
+
+# Medium Priority Rules (Warnings)
+10003	WARN	Incomplete or No Cache-control and Pragma HTTP Header Set
+10004	WARN	X-Content-Type-Options Header Missing
+10009	WARN	In Page Banner Information Leak
+10010	WARN	Cookie No HttpOnly Flag
+10011	WARN	Cookie Without Secure Flag
+10015	WARN	Re-examine Cache-control Directives
+10017	WARN	Cross-Domain JavaScript Source File Inclusion
+10019	WARN	Content-Type Header Missing
+90011	WARN	Charset Mismatch
+90020	WARN	Missing Anti-clickjacking Header
+90022	WARN	Application Error Disclosure
+
+# Low Priority Rules (Ignore for now)
+10105	IGNORE	Weak Authentication Method
+2	IGNORE	Private IP Disclosure
+3	IGNORE	Session ID in URL Rewrite
+10048	IGNORE	Remote Code Execution - Shell Shock

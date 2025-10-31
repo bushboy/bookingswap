@@ -226,7 +226,7 @@ export const createOptimizedReducer = <T extends Record<string, any>>(
     }
 
     const newState = reducer(state, action);
-    
+
     // Only return new state if it actually changed
     if (shallowEqual(state, newState)) {
       return state;
@@ -286,7 +286,7 @@ export const restoreStateSnapshot = (snapshot: StateSnapshot) => {
 // Performance monitoring for state updates
 export const stateUpdateMonitor = {
   updateCounts: new Map<string, number>(),
-  
+
   trackUpdate: (actionType: string) => {
     const current = stateUpdateMonitor.updateCounts.get(actionType) || 0;
     stateUpdateMonitor.updateCounts.set(actionType, current + 1);
@@ -308,20 +308,20 @@ export const stateUpdateMonitor = {
 // Middleware for performance monitoring
 export const performanceMiddleware = (store: any) => (next: any) => (action: any) => {
   const startTime = performance.now();
-  
+
   // Track the update
   stateUpdateMonitor.trackUpdate(action.type);
-  
+
   const result = next(action);
-  
+
   const endTime = performance.now();
   const duration = endTime - startTime;
-  
+
   // Log slow updates in development
-  if (process.env.NODE_ENV === 'development' && duration > 16) {
+  if (import.meta.env.DEV && duration > 16) {
     console.warn(`Slow state update detected: ${action.type} took ${duration.toFixed(2)}ms`);
   }
-  
+
   return result;
 };
 

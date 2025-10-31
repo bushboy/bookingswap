@@ -36,6 +36,8 @@ describe('walletSlice', () => {
       lastUsedProvider: null,
       autoConnect: false,
     },
+    isInitialized: false,
+    lastStateUpdate: null,
   };
 
   const mockAccountInfo: AccountInfo = {
@@ -100,10 +102,15 @@ describe('walletSlice', () => {
 
       expect(state.isConnected).toBe(true);
       expect(state.currentProvider).toBe('hashpack');
-      expect(state.accountInfo).toEqual(mockAccountInfo);
+      // Check account info fields individually since lastUpdated is added automatically
+      expect(state.accountInfo?.accountId).toBe(mockAccountInfo.accountId);
+      expect(state.accountInfo?.balance).toBe(mockAccountInfo.balance);
+      expect(state.accountInfo?.network).toBe(mockAccountInfo.network);
+      expect(state.accountInfo?.lastUpdated).toBeDefined();
       expect(state.connectionStatus).toBe('connected');
       expect(state.error).toBeNull();
       expect(state.preferences.lastUsedProvider).toBe('hashpack');
+      expect(state.lastStateUpdate).toBeDefined();
     });
 
     it('should handle connectWalletFailure', () => {
@@ -124,7 +131,11 @@ describe('walletSlice', () => {
       expect(state.currentProvider).toBeNull();
       expect(state.accountInfo).toBeNull();
       expect(state.connectionStatus).toBe('error');
-      expect(state.error).toEqual(mockError);
+      // Check error fields individually since timestamp is added automatically
+      expect(state.error?.type).toBe(mockError.type);
+      expect(state.error?.message).toBe(mockError.message);
+      expect(state.error?.timestamp).toBeDefined();
+      expect(state.lastStateUpdate).toBeDefined();
     });
 
     it('should handle disconnectWallet', () => {
@@ -200,7 +211,12 @@ describe('walletSlice', () => {
         updateAccountInfo(newAccountInfo)
       );
 
-      expect(state.accountInfo).toEqual(newAccountInfo);
+      // Check account info fields individually since lastUpdated is added automatically
+      expect(state.accountInfo?.accountId).toBe(newAccountInfo.accountId);
+      expect(state.accountInfo?.balance).toBe(newAccountInfo.balance);
+      expect(state.accountInfo?.network).toBe(newAccountInfo.network);
+      expect(state.accountInfo?.lastUpdated).toBeDefined();
+      expect(state.lastStateUpdate).toBeDefined();
     });
 
     it('should handle updateBalance when accountInfo exists', () => {
@@ -278,8 +294,12 @@ describe('walletSlice', () => {
   describe('error handling', () => {
     it('should handle setError', () => {
       const state = walletSlice.reducer(initialState, setError(mockError));
-      expect(state.error).toEqual(mockError);
+      // Check error fields individually since timestamp is added automatically
+      expect(state.error?.type).toBe(mockError.type);
+      expect(state.error?.message).toBe(mockError.message);
+      expect(state.error?.timestamp).toBeDefined();
       expect(state.connectionStatus).toBe('error');
+      expect(state.lastStateUpdate).toBeDefined();
     });
 
     it('should handle setError with null', () => {
@@ -373,6 +393,8 @@ describe('walletSlice', () => {
           lastUsedProvider: 'hashpack',
           autoConnect: true,
         },
+        isInitialized: true,
+        lastStateUpdate: '2023-01-01T00:00:00.000Z',
       };
 
       const state = walletSlice.reducer(modifiedState, resetWalletState());
@@ -398,7 +420,10 @@ describe('walletSlice', () => {
       state = walletSlice.reducer(state, connectWalletSuccess(payload));
       expect(state.isConnected).toBe(true);
       expect(state.connectionStatus).toBe('connected');
-      expect(state.accountInfo).toEqual(mockAccountInfo);
+      // Check account info fields individually since lastUpdated is added automatically
+      expect(state.accountInfo?.accountId).toBe(mockAccountInfo.accountId);
+      expect(state.accountInfo?.balance).toBe(mockAccountInfo.balance);
+      expect(state.accountInfo?.network).toBe(mockAccountInfo.network);
     });
 
     it('should handle connection flow from start to failure', () => {
@@ -411,7 +436,9 @@ describe('walletSlice', () => {
       state = walletSlice.reducer(state, connectWalletFailure(mockError));
       expect(state.isConnected).toBe(false);
       expect(state.connectionStatus).toBe('error');
-      expect(state.error).toEqual(mockError);
+      // Check error fields individually since timestamp is added automatically
+      expect(state.error?.type).toBe(mockError.type);
+      expect(state.error?.message).toBe(mockError.message);
     });
 
     it('should handle provider management during connection', () => {

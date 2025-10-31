@@ -3,6 +3,7 @@ import { Express } from 'express';
 import express from 'express';
 import { UserController } from '../controllers/UserController';
 import { createUserRoutes } from '../routes/users';
+import { WALLET_CONFIG } from '../../../../tests/fixtures/wallet-config';
 
 // Mock the repositories for testing
 const mockUserRepository = {
@@ -20,7 +21,7 @@ const mockSwapRepository = {
 // Mock auth middleware with a test user
 const mockUser = {
   id: 'test-user-id',
-  walletAddress: '0.0.123456',
+  walletAddress: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT,
   profile: {
     displayName: 'Test User',
     email: 'test@example.com',
@@ -64,14 +65,14 @@ describe('User Management API Endpoints', () => {
     // Create test app with mocked dependencies
     app = express();
     app.use(express.json());
-    
+
     const userController = new UserController(
       mockUserRepository as any,
       mockBookingRepository as any,
       mockSwapRepository as any
     );
     const authMiddleware = mockAuthMiddleware as any;
-    
+
     app.use('/api/users', createUserRoutes(userController, authMiddleware));
   });
 
@@ -88,7 +89,7 @@ describe('User Management API Endpoints', () => {
 
       expect(response.body.user).toBeDefined();
       expect(response.body.user.id).toBe('test-user-id');
-      expect(response.body.user.walletAddress).toBe('0.0.123456');
+      expect(response.body.user.walletAddress).toBe(WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT);
       expect(response.body.user.profile.displayName).toBe('Test User');
       expect(response.body.user.profile.email).toBe('test@example.com');
       expect(response.body.user.verification.level).toBe('verified');

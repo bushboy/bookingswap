@@ -358,7 +358,7 @@ export class ErrorLoggingService {
      */
     private logToExternalService(errorDetails: ErrorDetails): void {
         // In production, this would send to services like Sentry, LogRocket, etc.
-        if (process.env.NODE_ENV === 'production') {
+        if (import.meta.env.PROD) {
             // Placeholder for external service integration
             console.log('Would send to external error service:', {
                 errorId: errorDetails.errorId,

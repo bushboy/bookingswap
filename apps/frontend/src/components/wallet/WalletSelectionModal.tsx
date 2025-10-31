@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { tokens } from '@/design-system/tokens';
 import {
   useWallet,
   useWalletConnection,
-  useWalletProviders,
 } from '@/hooks/useWallet';
 import { WalletErrorType } from '@/types/wallet';
 
@@ -23,12 +22,7 @@ interface WalletProviderInfo {
   troubleshootingUrl?: string;
 }
 
-interface ProviderAvailabilityState {
-  isAvailable: boolean;
-  isChecking: boolean;
-  lastChecked?: number;
-  error?: string;
-}
+
 
 // Provider information for display
 const PROVIDER_INFO: Record<string, WalletProviderInfo> = {
@@ -81,132 +75,20 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-  const [providerAvailability, setProviderAvailability] = useState<
-    Record<string, ProviderAvailabilityState>
-  >({});
+  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
 
   const {
     error,
     isConnecting,
     clearError,
-    needsProviderInstallation,
-    getProviderAvailabilityStatus,
   } = useWallet();
 
   const { connect } = useWalletConnection();
-  const { availableProviders, refreshAvailableProviders } =
-    useWalletProviders();
 
-  // Enhanced provider availability checking with real-time updates
-  const checkProviderAvailability = useCallback(async () => {
-    if (!isOpen) return;
 
-    const newAvailability: Record<string, ProviderAvailabilityState> = {};
-
-    for (const providerId of Object.keys(PROVIDER_INFO)) {
-      // Set checking state
-      setProviderAvailability(prev => ({
-        ...prev,
-        [providerId]: {
-          ...prev[providerId],
-          isChecking: true,
-        }
-      }));
-
-      try {
-        let isAvailable = false;
-
-        if (providerId === 'kabila') {
-          // Enhanced Kabila availability detection
-          isAvailable = await checkKabilaAvailability();
-        } else {
-          // Standard availability check for other providers
-          isAvailable = availableProviders.includes(providerId);
-        }
-
-        newAvailability[providerId] = {
-          isAvailable,
-          isChecking: false,
-          lastChecked: Date.now(),
-          error: undefined,
-        };
-      } catch (error) {
-        newAvailability[providerId] = {
-          isAvailable: false,
-          isChecking: false,
-          lastChecked: Date.now(),
-          error: error instanceof Error ? error.message : 'Unknown error',
-        };
-      }
-    }
-
-    setProviderAvailability(prev => ({ ...prev, ...newAvailability }));
-  }, [isOpen, availableProviders]);
-
-  // Enhanced Kabila availability detection
-  const checkKabilaAvailability = async (): Promise<boolean> => {
-    try {
-      // Use the wallet service's enhanced availability checking
-      if (getProviderAvailabilityStatus) {
-        const status = await getProviderAvailabilityStatus();
-        return status.kabila || false;
-      }
-
-      // Fallback to basic check
-      return availableProviders.includes('kabila');
-    } catch (error) {
-      console.warn('Kabila availability check failed:', error);
-      return false;
-    }
-  };
-
-  // Check provider availability on mount and when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      checkProviderAvailability();
-      refreshAvailableProviders();
-    }
-  }, [isOpen, refreshAvailableProviders, checkProviderAvailability]);
-
-  // Set up real-time availability updates for Kabila
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const interval = setInterval(() => {
-      // Only refresh Kabila availability in real-time
-      checkKabilaAvailability().then(isAvailable => {
-        setProviderAvailability(prev => ({
-          ...prev,
-          kabila: {
-            ...prev.kabila,
-            isAvailable,
-            lastChecked: Date.now(),
-          }
-        }));
-      }).catch(error => {
-        setProviderAvailability(prev => ({
-          ...prev,
-          kabila: {
-            ...prev.kabila,
-            isAvailable: false,
-            lastChecked: Date.now(),
-            error: error instanceof Error ? error.message : 'Check failed',
-          }
-        }));
-      });
-    }, 5000); // Check every 5 seconds
-
-    return () => clearInterval(interval);
-  }, [isOpen]);
 
   const handleProviderSelect = async (providerId: string) => {
-    const availability = providerAvailability[providerId];
-    if (!availability?.isAvailable || availability.isChecking) {
-      return; // Provider not available or still checking
-    }
-
-    setSelectedProvider(providerId);
+    setConnectingProvider(providerId);
     clearError();
 
     try {
@@ -214,12 +96,9 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
       onClose(); // Close modal on successful connection
     } catch (error) {
       console.error('Failed to connect to provider:', error);
-      setSelectedProvider(null);
-
-      // Refresh availability after connection failure
-      if (providerId === 'kabila') {
-        setTimeout(() => checkProviderAvailability(), 1000);
-      }
+      // Error will be handled by the error display component
+    } finally {
+      setConnectingProvider(null);
     }
   };
 
@@ -232,12 +111,10 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
 
   const handleRetry = () => {
     clearError();
-    checkProviderAvailability();
-    refreshAvailableProviders();
   };
 
   const handleClose = () => {
-    setSelectedProvider(null);
+    setConnectingProvider(null);
     clearError();
     onClose();
   };
@@ -246,31 +123,23 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
     providerId: string,
     providerInfo: WalletProviderInfo
   ) => {
-    const availability = providerAvailability[providerId] || {
-      isAvailable: false,
-      isChecking: false,
-    };
-    const { isAvailable, isChecking, error } = availability;
-    const isSelected = selectedProvider === providerId;
-    const isLoading = isConnecting && isSelected;
+    const isConnectingThis = connectingProvider === providerId;
+    const isLoading = isConnecting && isConnectingThis;
 
-    // Enhanced status display for Kabila
+    // Show mock wallet as ready in development
+    const isMockWallet = providerId === 'mock';
+    const isReady = isMockWallet && (import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCK_WALLET === 'true');
+
     const getStatusText = () => {
-      if (isChecking) return 'Checking...';
-      if (error) return 'Check failed';
-      if (isAvailable) return providerInfo.description;
-
-      if (providerId === 'kabila') {
-        return 'Extension not detected';
-      }
-      return 'Not installed';
+      if (isLoading) return 'Connecting...';
+      if (isReady) return 'Ready for testing';
+      return providerInfo.description;
     };
 
     const getStatusColor = () => {
-      if (isChecking) return tokens.colors.primary[600];
-      if (error) return tokens.colors.error[600];
-      if (isAvailable) return tokens.colors.neutral[600];
-      return tokens.colors.neutral[400];
+      if (isLoading) return tokens.colors.primary[600];
+      if (isReady) return tokens.colors.success[600];
+      return tokens.colors.neutral[600];
     };
 
     return (
@@ -281,42 +150,33 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
           alignItems: 'center',
           gap: tokens.spacing[3],
           padding: tokens.spacing[4],
-          border: `1px solid ${isAvailable
-            ? tokens.colors.neutral[200]
-            : error
-              ? tokens.colors.error[200]
-              : tokens.colors.neutral[100]
+          border: `1px solid ${isReady
+            ? tokens.colors.success[200]
+            : tokens.colors.neutral[200]
             }`,
           borderRadius: tokens.borderRadius.md,
-          cursor: isAvailable && !isChecking ? 'pointer' : 'default',
+          cursor: isLoading ? 'default' : 'pointer',
           transition: 'all 0.2s ease-in-out',
           marginBottom: tokens.spacing[3],
-          backgroundColor: isAvailable
-            ? isSelected
+          backgroundColor: isReady
+            ? tokens.colors.success[50]
+            : isConnectingThis
               ? tokens.colors.primary[50]
-              : 'white'
-            : error
-              ? tokens.colors.error[50]
-              : tokens.colors.neutral[50],
-          opacity: isAvailable ? 1 : 0.6,
-          ...(isAvailable && !isChecking && {
-            ':hover': {
-              borderColor: tokens.colors.primary[300],
-              backgroundColor: tokens.colors.primary[50],
-            },
-          }),
+              : 'white',
+          opacity: isLoading ? 0.7 : 1,
+
         }}
-        onClick={() => isAvailable && !isChecking && handleProviderSelect(providerId)}
+        onClick={() => !isLoading && handleProviderSelect(providerId)}
       >
         <div
           style={{
             width: '48px',
             height: '48px',
             borderRadius: tokens.borderRadius.md,
-            backgroundColor: isAvailable
-              ? tokens.colors.primary[100]
-              : error
-                ? tokens.colors.error[100]
+            backgroundColor: isReady
+              ? tokens.colors.success[100]
+              : isLoading
+                ? tokens.colors.primary[100]
                 : tokens.colors.neutral[200],
             display: 'flex',
             alignItems: 'center',
@@ -325,7 +185,7 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
             position: 'relative',
           }}
         >
-          {isChecking ? (
+          {isLoading ? (
             <div
               style={{
                 width: '20px',
@@ -346,11 +206,7 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
             style={{
               fontSize: tokens.typography.fontSize.base,
               fontWeight: tokens.typography.fontWeight.semibold,
-              color: isAvailable
-                ? tokens.colors.neutral[900]
-                : error
-                  ? tokens.colors.error[700]
-                  : tokens.colors.neutral[500],
+              color: tokens.colors.neutral[900],
               marginBottom: tokens.spacing[1],
               display: 'flex',
               alignItems: 'center',
@@ -358,7 +214,7 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
             }}
           >
             {providerInfo.name}
-            {providerId === 'kabila' && isAvailable && (
+            {isReady && (
               <span
                 style={{
                   fontSize: tokens.typography.fontSize.xs,
@@ -377,22 +233,10 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
             style={{
               fontSize: tokens.typography.fontSize.sm,
               color: getStatusColor(),
-              marginBottom: error ? tokens.spacing[1] : 0,
             }}
           >
             {getStatusText()}
           </div>
-          {error && providerId === 'kabila' && (
-            <div
-              style={{
-                fontSize: tokens.typography.fontSize.xs,
-                color: tokens.colors.error[600],
-                fontStyle: 'italic',
-              }}
-            >
-              Try refreshing or check extension
-            </div>
-          )}
         </div>
 
         {isLoading && (
@@ -408,31 +252,17 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
           />
         )}
 
-        {!isAvailable && !isChecking && (
-          <div style={{ display: 'flex', gap: tokens.spacing[2] }}>
-            {providerId === 'kabila' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={e => {
-                  e.stopPropagation();
-                  checkProviderAvailability();
-                }}
-              >
-                Refresh
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={e => {
-                e.stopPropagation();
-                handleInstallProvider(providerId);
-              }}
-            >
-              Install
-            </Button>
-          </div>
+        {!isReady && !isLoading && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={e => {
+              e.stopPropagation();
+              handleInstallProvider(providerId);
+            }}
+          >
+            Install
+          </Button>
         )}
       </div>
     );
@@ -448,8 +278,8 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
     let troubleshootingSteps: string[] = [];
     let installUrl = '';
 
-    // Enhanced Kabila-specific error handling
-    const isKabilaError = selectedProvider === 'kabila' ||
+    // Enhanced error handling based on connecting provider
+    const isKabilaError = connectingProvider === 'kabila' ||
       error.message.toLowerCase().includes('kabila');
 
     switch (error.type) {
@@ -464,7 +294,17 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
             'Try restarting your browser if the issue persists'
           ];
         } else {
-          errorMessage = 'Wallet provider not found. Please install the wallet extension.';
+          const providerName = connectingProvider ? PROVIDER_INFO[connectingProvider]?.name || 'Wallet' : 'Wallet';
+          errorMessage = `${providerName} extension is not installed. Please install the extension and try again.`;
+          if (connectingProvider && PROVIDER_INFO[connectingProvider]?.installUrl) {
+            installUrl = PROVIDER_INFO[connectingProvider].installUrl;
+          }
+          troubleshootingSteps = [
+            `Install the ${providerName} extension from the official store`,
+            'Refresh this page after installation',
+            'Make sure the extension is enabled in your browser',
+            'Try restarting your browser if needed'
+          ];
         }
         showInstallGuidance = true;
         showTroubleshooting = true;
@@ -611,29 +451,13 @@ export const WalletSelectionModal: React.FC<WalletSelectionModalProps> = ({
               size="sm"
               onClick={() => window.open(installUrl, '_blank', 'noopener,noreferrer')}
             >
-              Install Kabila
+              Install {connectingProvider ? PROVIDER_INFO[connectingProvider]?.name || 'Wallet' : 'Wallet'}
             </Button>
           )}
 
-          {isKabilaError && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => checkProviderAvailability()}
-            >
-              Refresh Status
-            </Button>
-          )}
 
-          {showInstallGuidance && needsProviderInstallation && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => checkProviderAvailability()}
-            >
-              Check Again
-            </Button>
-          )}
+
+
 
           {isKabilaError && PROVIDER_INFO.kabila.troubleshootingUrl && (
             <Button

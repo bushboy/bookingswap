@@ -927,7 +927,7 @@ export class WalletConnectionValidator {
      */
     private detectConnectionType(): 'mock' | 'real' {
         // Check if we're in development/test environment
-        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+        if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
             return 'mock';
         }
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
 import { Express } from 'express';
 import { createApp } from '../index';
+import { WALLET_CONFIG } from '../../../../tests/fixtures/wallet-config';
 
 // Mock database and external services for integration tests
 vi.mock('../database', () => ({
@@ -38,7 +39,7 @@ vi.mock('../database/repositories/UserRepository', () => ({
     findByWalletAddress: vi.fn().mockResolvedValue(null),
     create: vi.fn().mockResolvedValue({
       id: 'test-user-id',
-      walletAddress: '0.0.123456',
+      walletAddress: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT,
       profile: {
         preferences: { notifications: true },
       },
@@ -59,7 +60,7 @@ vi.mock('../database/repositories/UserRepository', () => ({
     updateLastActive: vi.fn(),
     findById: vi.fn().mockResolvedValue({
       id: 'test-user-id',
-      walletAddress: '0.0.123456',
+      walletAddress: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT,
       profile: {
         preferences: { notifications: true },
       },
@@ -79,7 +80,7 @@ vi.mock('../database/repositories/UserRepository', () => ({
     }),
     update: vi.fn().mockResolvedValue({
       id: 'test-user-id',
-      walletAddress: '0.0.123456',
+      walletAddress: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT,
       profile: {
         displayName: 'Updated Name',
         preferences: { notifications: false },
@@ -120,7 +121,7 @@ describe('Authentication Integration Tests', () => {
     // Set test environment variables
     process.env.JWT_SECRET = 'test-secret-key';
     process.env.NODE_ENV = 'test';
-    
+
     app = await createApp();
   });
 
@@ -136,13 +137,13 @@ describe('Authentication Integration Tests', () => {
     it('should generate challenge message', async () => {
       const response = await request(app)
         .post('/api/auth/challenge')
-        .send({ walletAddress: '0.0.123456' })
+        .send({ walletAddress: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT })
         .expect(200);
 
       expect(response.body).toHaveProperty('message');
-      expect(response.body).toHaveProperty('walletAddress', '0.0.123456');
+      expect(response.body).toHaveProperty('walletAddress', WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT);
       expect(response.body.message).toContain('Booking Swap Platform');
-      expect(response.body.message).toContain('0.0.123456');
+      expect(response.body.message).toContain(WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT);
     });
 
     it('should authenticate user with wallet signature', async () => {
@@ -150,7 +151,7 @@ describe('Authentication Integration Tests', () => {
         message: 'Test challenge message',
         signature: 'test-signature',
         publicKey: 'test-public-key',
-        walletAddress: '0.0.123456',
+        walletAddress: WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT,
       };
 
       const response = await request(app)
@@ -161,7 +162,7 @@ describe('Authentication Integration Tests', () => {
       expect(response.body).toHaveProperty('user');
       expect(response.body).toHaveProperty('token');
       expect(response.body).toHaveProperty('expiresAt');
-      expect(response.body.user.walletAddress).toBe('0.0.123456');
+      expect(response.body.user.walletAddress).toBe(WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT);
 
       authToken = response.body.token;
     });
@@ -174,7 +175,7 @@ describe('Authentication Integration Tests', () => {
 
       expect(response.body).toHaveProperty('user');
       expect(response.body).toHaveProperty('tokenPayload');
-      expect(response.body.user.walletAddress).toBe('0.0.123456');
+      expect(response.body.user.walletAddress).toBe(WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT);
     });
 
     it('should refresh authentication token', async () => {
@@ -196,7 +197,7 @@ describe('Authentication Integration Tests', () => {
         .expect(200);
 
       expect(response.body).toHaveProperty('user');
-      expect(response.body.user.walletAddress).toBe('0.0.123456');
+      expect(response.body.user.walletAddress).toBe(WALLET_CONFIG.PRIMARY_TESTNET_ACCOUNT);
     });
 
     it('should update user profile', async () => {

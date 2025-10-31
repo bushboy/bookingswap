@@ -13,8 +13,8 @@ import { ReceivedProposalsSection } from './ReceivedProposalsSection';
 interface EnhancedSwapCardProps {
     swapData: SwapCardData | EnhancedSwapCardData;
     currentUserId?: string;
-    onAcceptProposal?: (proposalId: string) => void;
-    onRejectProposal?: (proposalId: string) => void;
+    onAcceptProposal?: (proposalId: string) => Promise<void> | void;
+    onRejectProposal?: (proposalId: string, reason?: string) => Promise<void> | void;
     onViewDetails?: () => void;
     onMakeProposal?: (swapId: string) => void;
     // Targeting action handlers
@@ -1021,17 +1021,26 @@ export const EnhancedSwapCard: React.FC<EnhancedSwapCardProps> = ({
 
 
                 {/* Proposals Section */}
-                {currentSwapData.proposalsFromOthers && currentSwapData.proposalsFromOthers.length > 0 && (
-                    <div style={{ marginTop: tokens.spacing[6] }}>
-                        <ReceivedProposalsSection
-                            proposals={currentSwapData.proposalsFromOthers}
-                            onAcceptProposal={onAcceptProposal || (() => { })}
-                            onRejectProposal={onRejectProposal || (() => { })}
-                            showInCard={true}
-                            maxVisibleInCard={2}
-                        />
-                    </div>
-                )}
+                {(() => {
+                    console.log(`[EnhancedSwapCard] Checking proposals for swap ${userSwap.id}:`, {
+                        hasProposals: !!currentSwapData.proposalsFromOthers,
+                        proposalCount: currentSwapData.proposalsFromOthers?.length || 0,
+                        proposals: currentSwapData.proposalsFromOthers?.map(p => ({ id: p.id, status: p.status })) || []
+                    });
+                    return currentSwapData.proposalsFromOthers && currentSwapData.proposalsFromOthers.length > 0;
+                })() && (
+                        <div style={{ marginTop: tokens.spacing[6] }}>
+                            <ReceivedProposalsSection
+                                proposals={currentSwapData.proposalsFromOthers}
+                                onAcceptProposal={onAcceptProposal || (() => { })}
+                                onRejectProposal={onRejectProposal || (() => { })}
+                                showInCard={true}
+                                maxVisibleInCard={2}
+                                currentUserId={currentUserId}
+                                swapId={userSwap.id}
+                            />
+                        </div>
+                    )}
 
                 {/* Simple Targeting Information Display */}
                 {(incomingTargets.length > 0 || outgoingTarget) && targetingExpanded && (

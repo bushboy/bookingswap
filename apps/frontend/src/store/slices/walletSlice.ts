@@ -7,12 +7,26 @@ import {
   WalletConnection,
 } from '../../types/wallet';
 
-interface WalletSliceState extends WalletState {
+// Serializable versions of wallet types
+interface SerializableWalletError extends Omit<WalletError, 'timestamp'> {
+  timestamp?: string; // ISO string instead of Date
+}
+
+interface SerializableAccountInfo extends Omit<AccountInfo, 'lastUpdated'> {
+  lastUpdated?: string; // ISO string instead of Date
+}
+
+interface WalletSliceState extends Omit<WalletState, 'error'> {
   availableProviders: string[];
   preferences: {
     lastUsedProvider: string | null;
     autoConnect: boolean;
   };
+  error: SerializableWalletError | null;
+  accountInfo: SerializableAccountInfo | null;
+  // New fields for reliability and serialization
+  isInitialized: boolean;
+  lastStateUpdate: string | null; // ISO string timestamp
 }
 
 const initialState: WalletSliceState = {
@@ -26,6 +40,8 @@ const initialState: WalletSliceState = {
     lastUsedProvider: null,
     autoConnect: false,
   },
+  isInitialized: false,
+  lastStateUpdate: null,
 };
 
 export const walletSlice = createSlice({
@@ -35,6 +51,7 @@ export const walletSlice = createSlice({
     // Connection lifecycle actions
     setConnectionStatus: (state, action: PayloadAction<ConnectionStatus>) => {
       state.connectionStatus = action.payload;
+      state.lastStateUpdate = new Date().toISOString();
       if (action.payload === 'connecting') {
         state.error = null;
       }
@@ -44,6 +61,7 @@ export const walletSlice = createSlice({
       state.connectionStatus = 'connecting';
       state.currentProvider = action.payload;
       state.error = null;
+      state.lastStateUpdate = new Date().toISOString();
     },
 
     connectWalletSuccess: (
@@ -57,10 +75,15 @@ export const walletSlice = createSlice({
       const { connection, accountInfo, provider } = action.payload;
       state.isConnected = connection.isConnected;
       state.currentProvider = provider;
-      state.accountInfo = accountInfo;
+      // Ensure accountInfo is serializable
+      state.accountInfo = {
+        ...accountInfo,
+        lastUpdated: new Date().toISOString(),
+      };
       state.connectionStatus = 'connected';
       state.error = null;
       state.preferences.lastUsedProvider = provider;
+      state.lastStateUpdate = new Date().toISOString();
     },
 
     connectWalletFailure: (state, action: PayloadAction<WalletError>) => {
@@ -68,7 +91,12 @@ export const walletSlice = createSlice({
       state.currentProvider = null;
       state.accountInfo = null;
       state.connectionStatus = 'error';
-      state.error = action.payload;
+      // Ensure error is serializable
+      state.error = {
+        ...action.payload,
+        timestamp: new Date().toISOString(),
+      };
+      state.lastStateUpdate = new Date().toISOString();
     },
 
     disconnectWallet: state => {
@@ -77,16 +105,24 @@ export const walletSlice = createSlice({
       state.accountInfo = null;
       state.connectionStatus = 'idle';
       state.error = null;
+      state.lastStateUpdate = new Date().toISOString();
     },
 
     // Account info updates
     updateAccountInfo: (state, action: PayloadAction<AccountInfo>) => {
-      state.accountInfo = action.payload;
+      // Ensure accountInfo is serializable
+      state.accountInfo = {
+        ...action.payload,
+        lastUpdated: new Date().toISOString(),
+      };
+      state.lastStateUpdate = new Date().toISOString();
     },
 
     updateBalance: (state, action: PayloadAction<string>) => {
       if (state.accountInfo) {
         state.accountInfo.balance = action.payload;
+        state.accountInfo.lastUpdated = new Date().toISOString();
+        state.lastStateUpdate = new Date().toISOString();
       }
     },
 
@@ -109,10 +145,17 @@ export const walletSlice = createSlice({
 
     // Error handling
     setError: (state, action: PayloadAction<WalletError | null>) => {
-      state.error = action.payload;
       if (action.payload) {
+        // Ensure error is serializable
+        state.error = {
+          ...action.payload,
+          timestamp: new Date().toISOString(),
+        };
         state.connectionStatus = 'error';
+      } else {
+        state.error = null;
       }
+      state.lastStateUpdate = new Date().toISOString();
     },
 
     clearError: state => {
@@ -120,6 +163,7 @@ export const walletSlice = createSlice({
       if (state.connectionStatus === 'error') {
         state.connectionStatus = state.isConnected ? 'connected' : 'idle';
       }
+      state.lastStateUpdate = new Date().toISOString();
     },
 
     // Preferences
@@ -128,10 +172,18 @@ export const walletSlice = createSlice({
       action: PayloadAction<Partial<WalletSliceState['preferences']>>
     ) => {
       state.preferences = { ...state.preferences, ...action.payload };
+      state.lastStateUpdate = new Date().toISOString();
     },
 
     setAutoConnect: (state, action: PayloadAction<boolean>) => {
       state.preferences.autoConnect = action.payload;
+      state.lastStateUpdate = new Date().toISOString();
+    },
+
+    // New action for initialization
+    initializeWalletService: (state) => {
+      state.isInitialized = true;
+      state.lastStateUpdate = new Date().toISOString();
     },
 
     // Reset state
@@ -154,5 +206,6 @@ export const {
   clearError,
   setPreferences,
   setAutoConnect,
+  initializeWalletService,
   resetWalletState,
 } = walletSlice.actions;

@@ -8,6 +8,7 @@ export { BladeAdapter } from './BladeAdapter';
 export { WalletService, walletService } from './WalletService';
 export { WalletStateMonitor } from './WalletStateMonitor';
 export { WalletConnectionValidator } from './WalletConnectionValidator';
+export { ConnectionValidator, DEFAULT_VALIDATION_RULES } from './ConnectionValidator';
 export {
   initializeWalletProviders,
   getRegisteredProviders,
@@ -33,5 +34,11 @@ export type {
   StateChangeCallback,
   WalletStateMonitorConfig,
 } from './WalletStateMonitor';
+
+// Re-export ConnectionValidator types
+export type {
+  ValidationResult,
+  ValidationRules,
+} from './ConnectionValidator';
 
 export { WalletErrorType } from '../../types/wallet';

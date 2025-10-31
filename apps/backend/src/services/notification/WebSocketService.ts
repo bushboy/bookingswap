@@ -99,6 +99,31 @@ export class WebSocketService {
         socket.to(`user:${userId}`).emit('targeting:status_read', data.targetId);
       });
 
+      // Handle completion-specific events
+      socket.on('completion:subscribe', (data: { proposalId?: string }) => {
+        if (data.proposalId) {
+          socket.join(`completion:${data.proposalId}`);
+          logger.info('User subscribed to completion updates', { userId, proposalId: data.proposalId });
+        }
+      });
+
+      socket.on('completion:unsubscribe', (data: { proposalId?: string }) => {
+        if (data.proposalId) {
+          socket.leave(`completion:${data.proposalId}`);
+          logger.info('User unsubscribed from completion updates', { userId, proposalId: data.proposalId });
+        }
+      });
+
+      socket.on('completion:status_read', (data: { proposalId: string }) => {
+        logger.info('Completion status notification marked as read', { userId, proposalId: data.proposalId });
+        socket.to(`user:${userId}`).emit('completion:status_read', data.proposalId);
+      });
+
+      socket.on('ownership:transfer_acknowledged', (data: { bookingId: string, proposalId: string }) => {
+        logger.info('Ownership transfer acknowledged', { userId, bookingId: data.bookingId, proposalId: data.proposalId });
+        socket.to(`user:${userId}`).emit('ownership:transfer_acknowledged', data);
+      });
+
       // Handle typing indicators for chat (future feature)
       socket.on('typing:start', (data: { swapId: string }) => {
         socket.to(`swap:${data.swapId}`).emit('typing:start', { userId });
@@ -363,6 +388,163 @@ export class WebSocketService {
         const socket = this.io.sockets.sockets.get(socketId);
         if (socket) {
           socket.leave(`proposal:${proposalId}`);
+        }
+      });
+    }
+  }
+
+  /**
+   * Send real-time completion status update
+   * Requirements: 8.5
+   */
+  async sendCompletionStatusUpdate(data: {
+    proposalId: string;
+    status: 'initiated' | 'completed' | 'failed' | 'rolled_back';
+    completionType: 'booking_exchange' | 'cash_payment';
+    proposerId: string;
+    targetUserId: string;
+    completedSwaps?: Array<{
+      swapId: string;
+      newStatus: string;
+      completedAt: Date;
+    }>;
+    updatedBookings?: Array<{
+      bookingId: string;
+      newStatus: string;
+      swappedAt: Date;
+      ownershipTransferred: boolean;
+    }>;
+    blockchainTransaction?: {
+      transactionId: string;
+      consensusTimestamp?: string;
+    };
+    errorDetails?: string;
+  }): Promise<void> {
+    const update = {
+      proposalId: data.proposalId,
+      status: data.status,
+      completionType: data.completionType,
+      completedSwaps: data.completedSwaps,
+      updatedBookings: data.updatedBookings,
+      blockchainTransaction: data.blockchainTransaction,
+      errorDetails: data.errorDetails,
+      timestamp: new Date()
+    };
+
+    // Send to both proposer and target user
+    this.io.to(`user:${data.proposerId}`).emit('completion:status_update', update);
+    this.io.to(`user:${data.targetUserId}`).emit('completion:status_update', update);
+
+    // Also send to proposal-specific room if users are subscribed
+    this.io.to(`proposal:${data.proposalId}`).emit('completion:status_update', update);
+
+    logger.info('Completion status update sent via WebSocket', {
+      proposalId: data.proposalId,
+      status: data.status,
+      proposerId: data.proposerId,
+      targetUserId: data.targetUserId
+    });
+  }
+
+  /**
+   * Send real-time ownership transfer notification
+   * Requirements: 8.4, 8.5
+   */
+  async sendOwnershipTransferUpdate(data: {
+    proposalId: string;
+    bookingId: string;
+    previousOwnerId: string;
+    newOwnerId: string;
+    transferredAt: Date;
+    bookingTitle: string;
+    exchangePartnerName: string;
+  }): Promise<void> {
+    const update = {
+      proposalId: data.proposalId,
+      bookingId: data.bookingId,
+      previousOwnerId: data.previousOwnerId,
+      newOwnerId: data.newOwnerId,
+      transferredAt: data.transferredAt,
+      bookingTitle: data.bookingTitle,
+      exchangePartnerName: data.exchangePartnerName,
+      timestamp: new Date()
+    };
+
+    // Send to both previous and new owner
+    this.io.to(`user:${data.previousOwnerId}`).emit('ownership:transferred', update);
+    this.io.to(`user:${data.newOwnerId}`).emit('ownership:transferred', update);
+
+    // Also send to booking-specific room if it exists
+    this.io.to(`booking:${data.bookingId}`).emit('ownership:transferred', update);
+
+    logger.info('Ownership transfer update sent via WebSocket', {
+      proposalId: data.proposalId,
+      bookingId: data.bookingId,
+      previousOwnerId: data.previousOwnerId,
+      newOwnerId: data.newOwnerId
+    });
+  }
+
+  /**
+   * Send completion validation warning via WebSocket
+   * Requirements: 8.5
+   */
+  async sendCompletionValidationWarning(data: {
+    proposalId: string;
+    userId: string;
+    validationErrors: string[];
+    validationWarnings: string[];
+    inconsistentEntities: string[];
+    requiresManualReview: boolean;
+  }): Promise<void> {
+    const warning = {
+      proposalId: data.proposalId,
+      validationErrors: data.validationErrors,
+      validationWarnings: data.validationWarnings,
+      inconsistentEntities: data.inconsistentEntities,
+      requiresManualReview: data.requiresManualReview,
+      timestamp: new Date()
+    };
+
+    // Send to the specific user
+    this.io.to(`user:${data.userId}`).emit('completion:validation_warning', warning);
+
+    // Also send to proposal-specific room
+    this.io.to(`proposal:${data.proposalId}`).emit('completion:validation_warning', warning);
+
+    logger.info('Completion validation warning sent via WebSocket', {
+      proposalId: data.proposalId,
+      userId: data.userId,
+      errorCount: data.validationErrors.length,
+      warningCount: data.validationWarnings.length
+    });
+  }
+
+  /**
+   * Join user to completion room for real-time updates
+   */
+  joinCompletionRoom(userId: string, proposalId: string): void {
+    const userSocketSet = this.userSockets.get(userId);
+    if (userSocketSet) {
+      userSocketSet.forEach(socketId => {
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.join(`completion:${proposalId}`);
+        }
+      });
+    }
+  }
+
+  /**
+   * Leave completion room
+   */
+  leaveCompletionRoom(userId: string, proposalId: string): void {
+    const userSocketSet = this.userSockets.get(userId);
+    if (userSocketSet) {
+      userSocketSet.forEach(socketId => {
+        const socket = this.io.sockets.sockets.get(socketId);
+        if (socket) {
+          socket.leave(`completion:${proposalId}`);
         }
       });
     }

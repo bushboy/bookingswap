@@ -83,7 +83,7 @@ export class PerformanceMonitor {
   endTracking(componentName: string, trackingId: string): void {
     const componentMetrics = this.metrics.get(componentName);
     if (componentMetrics) {
-      const metric = componentMetrics.find(m => 
+      const metric = componentMetrics.find(m =>
         trackingId.includes(m.componentName) && !m.endTime
       );
       if (metric) {
@@ -99,13 +99,13 @@ export class PerformanceMonitor {
   getAverageLoadTime(componentName: string): number {
     const metrics = this.getMetrics(componentName);
     const completedMetrics = metrics.filter(m => m.endTime);
-    
+
     if (completedMetrics.length === 0) return 0;
-    
-    const totalTime = completedMetrics.reduce((sum, m) => 
+
+    const totalTime = completedMetrics.reduce((sum, m) =>
       sum + (m.endTime! - m.startTime), 0
     );
-    
+
     return totalTime / completedMetrics.length;
   }
 
@@ -145,7 +145,7 @@ export class ComponentCache<T = any> {
 
   get(key: string): T | null {
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       return null;
     }
@@ -158,7 +158,7 @@ export class ComponentCache<T = any> {
 
     // Update access count for LRU
     entry.accessCount++;
-    
+
     return entry.data;
   }
 
@@ -280,11 +280,11 @@ export function createLazyComponent<T extends ComponentType<any>>(
     const trackingId = monitor.startTracking(componentName, 'lazy');
 
     let retries = 0;
-    
+
     const loadWithRetry = (): Promise<{ default: T }> => {
       return Promise.race([
         importFn(),
-        new Promise<never>((_, reject) => 
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Component load timeout')), timeout)
         ),
       ]).catch((error) => {
@@ -330,7 +330,7 @@ export function createMemoizedSelector<T>(
   return (state: RootState): T => {
     if (state !== lastArgs) {
       const result = selector(state);
-      
+
       if (equalityFn) {
         if (!equalityFn(result, lastResult)) {
           lastResult = result;
@@ -338,10 +338,10 @@ export function createMemoizedSelector<T>(
       } else {
         lastResult = result;
       }
-      
+
       lastArgs = state;
     }
-    
+
     return lastResult;
   };
 }
@@ -380,7 +380,7 @@ export interface PerformanceReport {
 
 export async function generatePerformanceReport(): Promise<PerformanceReport> {
   const monitor = PerformanceMonitor.getInstance();
-  
+
   return {
     timestamp: Date.now(),
     componentMetrics: {
@@ -404,7 +404,7 @@ export async function generatePerformanceReport(): Promise<PerformanceReport> {
 
 // React DevTools integration
 export function enablePerformanceDevTools(): void {
-  if (process.env.NODE_ENV === 'development') {
+  if (import.meta.env.DEV) {
     // Enable React DevTools Profiler
     if (typeof window !== 'undefined' && (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__) {
       console.log('React DevTools detected - Performance monitoring enabled');

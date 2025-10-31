@@ -1,5 +1,4 @@
 import { Middleware } from '@reduxjs/toolkit';
-import { RootState } from '../index';
 import { proposalWebSocketService } from '../../services/proposalWebSocketService';
 import {
     updateProposal,
@@ -9,30 +8,90 @@ import {
     completeProposalOperation,
     removeOptimisticUpdate,
 } from '../slices/proposalAcceptanceSlice';
+import {
+    connectionThrottlingManager,
+    connectionStateChecker
+} from '../../utils/connectionThrottling';
+import { getServiceConfig, isThrottlingFeatureEnabled } from '../../config/connectionThrottling';
 
 /**
  * WebSocket middleware for handling real-time proposal updates
  * Implements requirements 1.5, 2.5, 7.1, 7.5 from the design document
+ * Enhanced with connection throttling (requirements 1.1, 3.1, 3.3)
  */
 export const proposalWebSocketMiddleware: Middleware = (store) => {
     let isInitialized = false;
     let currentUserId: string | null = null;
 
+    // Service identifier for throttling
+    const SERVICE_ID = 'proposalWebSocketService';
+
+    // Initialize throttling manager with service-specific config
+    const throttlingConfig = getServiceConfig(SERVICE_ID);
+    connectionThrottlingManager.updateConfig(throttlingConfig);
+
+    /**
+     * Throttled connection function that implements debouncing and state checking
+     * Requirements: 1.1, 3.1, 3.3
+     */
+    const throttledConnect = async (): Promise<void> => {
+        // Skip if throttling is disabled
+        if (!isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')) {
+            return proposalWebSocketService.connect();
+        }
+
+        // Check connection state first (requirement 3.1)
+        if (!connectionStateChecker.canConnect(SERVICE_ID)) {
+            if (isThrottlingFeatureEnabled('ENABLE_THROTTLING_DEBUG_LOGS')) {
+                console.log('ProposalWebSocket: Connection attempt skipped - already connected or throttled');
+            }
+            return;
+        }
+
+        // Use debounced connection (requirement 1.1, 3.3)
+        return connectionThrottlingManager.debounceConnection(
+            SERVICE_ID,
+            async () => {
+                try {
+                    await proposalWebSocketService.connect();
+                    // Update connection state on successful connection
+                    connectionStateChecker.setConnectionState(SERVICE_ID, true);
+
+                    if (isThrottlingFeatureEnabled('ENABLE_THROTTLING_DEBUG_LOGS')) {
+                        console.log('ProposalWebSocket: Connection established successfully');
+                    }
+                } catch (error) {
+                    // Keep connection state as disconnected on failure
+                    connectionStateChecker.setConnectionState(SERVICE_ID, false);
+                    throw error;
+                }
+            }
+        );
+    };
+
     // Initialize WebSocket service and event listeners
     const initializeWebSocket = () => {
         if (isInitialized) return;
 
-        // Connection event handlers
+        // Connection event handlers with state tracking
         proposalWebSocketService.on('connected', () => {
             console.log('Proposal WebSocket connected');
+            // Update connection state (requirement 3.1)
+            connectionStateChecker.setConnectionState(SERVICE_ID, true);
+            // Reset throttling tracking on successful connection
+            connectionThrottlingManager.resetConnectionTracking(SERVICE_ID);
         });
 
         proposalWebSocketService.on('disconnected', () => {
             console.log('Proposal WebSocket disconnected');
+            // Update connection state (requirement 3.1)
+            connectionStateChecker.setConnectionState(SERVICE_ID, false);
         });
 
         proposalWebSocketService.on('error', (error) => {
             console.error('Proposal WebSocket error:', error);
+            // Update connection state on error (requirement 3.1)
+            connectionStateChecker.setConnectionState(SERVICE_ID, false);
         });
 
         // Proposal status update handlers
@@ -139,7 +198,7 @@ export const proposalWebSocketMiddleware: Middleware = (store) => {
         isInitialized = true;
     };
 
-    // Subscribe to user proposals when user changes
+    // Subscribe to user proposals when user changes with connection check
     const subscribeToUserProposals = (userId: string) => {
         if (currentUserId !== userId) {
             if (currentUserId) {
@@ -147,14 +206,39 @@ export const proposalWebSocketMiddleware: Middleware = (store) => {
             }
 
             currentUserId = userId;
-            proposalWebSocketService.subscribeToCurrentUserProposals(userId);
+
+            // Ensure connection before subscribing (requirement 3.1)
+            if (connectionStateChecker.isConnected(SERVICE_ID)) {
+                proposalWebSocketService.subscribeToCurrentUserProposals(userId);
+            } else {
+                // Attempt throttled connection then subscribe
+                throttledConnect().then(() => {
+                    proposalWebSocketService.subscribeToCurrentUserProposals(userId);
+                }).catch((error) => {
+                    if (isThrottlingFeatureEnabled('ENABLE_THROTTLING_DEBUG_LOGS')) {
+                        console.error('ProposalWebSocket: Failed to connect for user subscription:', error);
+                    }
+                });
+            }
         }
     };
 
-    // Subscribe to specific proposals
+    // Subscribe to specific proposals with connection check
     const subscribeToProposals = (proposalIds: string[]) => {
         if (proposalIds.length > 0) {
-            proposalWebSocketService.subscribeToProposals(proposalIds);
+            // Ensure connection before subscribing (requirement 3.1)
+            if (connectionStateChecker.isConnected(SERVICE_ID)) {
+                proposalWebSocketService.subscribeToProposals(proposalIds);
+            } else {
+                // Attempt throttled connection then subscribe
+                throttledConnect().then(() => {
+                    proposalWebSocketService.subscribeToProposals(proposalIds);
+                }).catch((error) => {
+                    if (isThrottlingFeatureEnabled('ENABLE_THROTTLING_DEBUG_LOGS')) {
+                        console.error('ProposalWebSocket: Failed to connect for proposal subscription:', error);
+                    }
+                });
+            }
         }
     };
 
@@ -191,12 +275,14 @@ export const proposalWebSocketMiddleware: Middleware = (store) => {
             }
         }
 
-        // Handle proposal acceptance/rejection operations
+        // Handle proposal acceptance/rejection operations with throttling
         if (action.type?.startsWith('proposalAcceptance/')) {
-            // Connect to WebSocket if not already connected
-            if (!proposalWebSocketService.isConnected()) {
-                proposalWebSocketService.connect().catch(console.error);
-            }
+            // Use throttled connection instead of direct connect (requirement 1.1, 3.3)
+            throttledConnect().catch((error) => {
+                if (isThrottlingFeatureEnabled('ENABLE_THROTTLING_DEBUG_LOGS')) {
+                    console.error('ProposalWebSocket: Throttled connection failed:', error);
+                }
+            });
         }
 
         // Handle specific proposal operations
@@ -290,14 +376,52 @@ export const initializeProposalWebSocket = async (store: any) => {
         console.warn('Failed to restore proposal state from localStorage:', error);
     }
 
-    // Connect to WebSocket
-    proposalWebSocketService.connect().catch(console.error);
+    // Connect to WebSocket using throttled connection
+    const throttledConnect = async (): Promise<void> => {
+        // Skip if throttling is disabled
+        if (!isThrottlingFeatureEnabled('ENABLE_CONNECTION_THROTTLING')) {
+            return proposalWebSocketService.connect();
+        }
+
+        // Check connection state first
+        if (!connectionStateChecker.canConnect('proposalWebSocketService')) {
+            if (isThrottlingFeatureEnabled('ENABLE_THROTTLING_DEBUG_LOGS')) {
+                console.log('ProposalWebSocket: Initial connection attempt skipped - already connected or throttled');
+            }
+            return;
+        }
+
+        // Use debounced connection
+        return connectionThrottlingManager.debounceConnection(
+            'proposalWebSocketService',
+            async () => {
+                try {
+                    await proposalWebSocketService.connect();
+                    connectionStateChecker.setConnectionState('proposalWebSocketService', true);
+                } catch (error) {
+                    connectionStateChecker.setConnectionState('proposalWebSocketService', false);
+                    throw error;
+                }
+            }
+        );
+    };
+
+    throttledConnect().catch(console.error);
 };
 
 /**
  * Cleanup WebSocket connections
  */
 export const cleanupProposalWebSocket = () => {
+    const SERVICE_ID = 'proposalWebSocketService';
+
+    // Clear any pending throttled connections
+    connectionThrottlingManager.clearDebounce(SERVICE_ID);
+
+    // Reset connection state
+    connectionStateChecker.resetConnectionState(SERVICE_ID);
+
+    // Cleanup WebSocket service
     proposalWebSocketService.unsubscribeFromAll();
     proposalWebSocketService.disconnect();
 };

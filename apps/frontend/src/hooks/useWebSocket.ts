@@ -1,9 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { Notification } from '@booking-swap/shared';
 import { SwapEvent } from '../services/swapService';
+import { useWebSocketHealth } from './useWebSocketHealth';
+import {
+  connectionThrottlingManager,
+  connectionStateChecker
+} from '../utils/connectionThrottling';
+import { getServiceConfig, isThrottlingFeatureEnabled } from '../config/connectionThrottling';
 
 interface SwapUpdateData {
   swapId: string;
@@ -66,27 +72,79 @@ interface UseWebSocketOptions {
   onConnect?: () => void;
   onDisconnect?: () => void;
   onReconnect?: () => void;
+  // Health monitoring options
+  enableHealthMonitoring?: boolean;
+  onHealthChange?: (health: any) => void;
 }
 
 export const useWebSocket = (options: UseWebSocketOptions = {}) => {
+  const {
+    enableHealthMonitoring = true,
+    onHealthChange,
+    ...eventHandlers
+  } = options;
+
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const serviceId = 'useWebSocket';
 
-  const { token } = useSelector((state: RootState) => state.auth);
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
 
-  useEffect(() => {
-    if (!token) {
-      // Disconnect if no token
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-        socketRef.current = null;
-        setIsConnected(false);
-      }
-      return;
+  // Get throttling configuration for this service
+  const throttleConfig = getServiceConfig(serviceId);
+
+  // Get token from localStorage since it's not stored in Redux state
+  const getAuthToken = useCallback(() => {
+    return localStorage.getItem('auth_token') || localStorage.getItem('authToken');
+  }, []);
+
+  // Stable health change handler
+  const handleHealthChange = useCallback((health: any) => {
+    onHealthChange?.(health);
+    // Update local connection state based on health
+    const connected = health.status === 'connected';
+    setIsConnected(connected);
+    connectionStateChecker.setConnectionState(serviceId, connected);
+
+    if (health.status === 'error' || health.status === 'disconnected') {
+      setConnectionError(health.errorMessage || 'Connection lost');
+      connectionStateChecker.setConnectionState(serviceId, false);
+    } else {
+      setConnectionError(null);
+    }
+  }, [onHealthChange, serviceId]);
+
+  // Health monitoring
+  const { health, manualReconnect, resetReconnectAttempts } = useWebSocketHealth({
+    socket: socketRef.current,
+    onHealthChange: handleHealthChange,
+  });
+
+
+
+  // Throttled connection function
+  const createThrottledConnection = useCallback(async (): Promise<void> => {
+    const token = getAuthToken();
+
+    if (!token || !isAuthenticated) {
+      throw new Error('No authentication token available');
     }
 
-    // Create socket connection
+    // Check if we can connect (not already connected and throttling allows it)
+    // Only check if throttling is enabled for useWebSocket
+    if (isThrottlingFeatureEnabled('ENABLE_USE_WEBSOCKET_THROTTLING')) {
+      if (!connectionStateChecker.canConnect(serviceId)) {
+        const status = connectionStateChecker.getConnectionStatus(serviceId);
+        if (status.isConnected) {
+          console.log('WebSocket already connected, skipping connection attempt');
+          return;
+        }
+        throw new Error('Connection throttled or rate limited');
+      }
+    }
+
+    // Create socket connection without forceNew to prevent connection loops
     const socket = io(
       import.meta.env.VITE_API_BASE_URL?.replace('/api', '') ||
       'http://localhost:3001',
@@ -95,184 +153,278 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
           token: token,
         },
         transports: ['websocket', 'polling'],
-        timeout: 20000,
-        forceNew: true,
+        timeout: throttleConfig.connectionTimeout,
+        // Removed forceNew: true to prevent connection loops
       }
     );
 
     socketRef.current = socket;
+  }, [getAuthToken, isAuthenticated, serviceId, throttleConfig.connectionTimeout]);
 
-    // Connection event handlers
-    socket.on('connect', () => {
-      console.log('WebSocket connected');
-      setIsConnected(true);
-      setConnectionError(null);
-      options.onConnect?.();
-    });
+  // Stable event handlers using useCallback
+  const handleConnect = useCallback(() => {
+    console.log('WebSocket connected');
+    setIsConnected(true);
+    setConnectionError(null);
+    connectionStateChecker.setConnectionState(serviceId, true);
 
-    socket.on('disconnect', reason => {
-      console.log('WebSocket disconnected:', reason);
-      setIsConnected(false);
-      options.onDisconnect?.();
-    });
+    // Only reset throttling if enabled
+    if (isThrottlingFeatureEnabled('ENABLE_USE_WEBSOCKET_THROTTLING')) {
+      connectionThrottlingManager.resetConnectionTracking(serviceId);
+    }
 
-    socket.on('reconnect', () => {
-      console.log('WebSocket reconnected');
-      setIsConnected(true);
-      setConnectionError(null);
-      options.onReconnect?.();
-    });
+    resetReconnectAttempts();
+    eventHandlers.onConnect?.();
+  }, [serviceId, resetReconnectAttempts, eventHandlers.onConnect]);
 
-    socket.on('connect_error', error => {
-      console.error('WebSocket connection error:', error);
-      setConnectionError(error.message);
-      setIsConnected(false);
-    });
+  const handleDisconnect = useCallback((reason: string) => {
+    console.log('WebSocket disconnected:', reason);
+    setIsConnected(false);
+    connectionStateChecker.setConnectionState(serviceId, false);
+    eventHandlers.onDisconnect?.();
+  }, [serviceId, eventHandlers.onDisconnect]);
 
-    // Notification handlers
-    socket.on('notification', (notification: Notification) => {
-      console.log('Received notification:', notification);
-      options.onNotification?.(notification);
-    });
+  const handleReconnect = useCallback(() => {
+    console.log('WebSocket reconnected');
+    setIsConnected(true);
+    setConnectionError(null);
+    connectionStateChecker.setConnectionState(serviceId, true);
 
-    socket.on('notification:read', (notificationId: string) => {
-      console.log('Notification marked as read:', notificationId);
-      // Handle notification read status update
-    });
+    // Only reset throttling if enabled
+    if (isThrottlingFeatureEnabled('ENABLE_USE_WEBSOCKET_THROTTLING')) {
+      connectionThrottlingManager.resetConnectionTracking(serviceId);
+    }
 
-    // Swap update handlers
-    socket.on('swap:update', (data: SwapUpdateData) => {
-      console.log('Received swap update:', data);
-      options.onSwapUpdate?.(data);
-    });
+    resetReconnectAttempts();
+    eventHandlers.onReconnect?.();
+  }, [serviceId, resetReconnectAttempts, eventHandlers.onReconnect]);
 
-    socket.on(
-      'swap:proposal',
-      (data: { swapId: string; proposalId: string; event: SwapEvent }) => {
-        console.log('Received swap proposal:', data);
-        options.onSwapProposal?.(data);
+  const handleConnectError = useCallback((error: any) => {
+    console.error('WebSocket connection error:', error);
+    setConnectionError(error.message);
+    setIsConnected(false);
+    connectionStateChecker.setConnectionState(serviceId, false);
+  }, [serviceId]);
+
+  // Stable event handlers for all socket events
+  const handleNotification = useCallback((notification: Notification) => {
+    console.log('Received notification:', notification);
+    eventHandlers.onNotification?.(notification);
+  }, [eventHandlers.onNotification]);
+
+  const handleNotificationRead = useCallback((notificationId: string) => {
+    console.log('Notification marked as read:', notificationId);
+  }, []);
+
+  const handleSwapUpdate = useCallback((data: SwapUpdateData) => {
+    console.log('Received swap update:', data);
+    eventHandlers.onSwapUpdate?.(data);
+  }, [eventHandlers.onSwapUpdate]);
+
+  const handleSwapProposal = useCallback((data: { swapId: string; proposalId: string; event: SwapEvent }) => {
+    console.log('Received swap proposal:', data);
+    eventHandlers.onSwapProposal?.(data);
+  }, [eventHandlers.onSwapProposal]);
+
+  const handleSwapStatusChange = useCallback((data: {
+    swapId: string;
+    oldStatus: string;
+    newStatus: string;
+    event: SwapEvent;
+  }) => {
+    console.log('Received swap status change:', data);
+    eventHandlers.onSwapStatusChange?.(data);
+  }, [eventHandlers.onSwapStatusChange]);
+
+  const handleTargetingUpdate = useCallback((data: TargetingUpdateData) => {
+    console.log('Received targeting update:', data);
+    eventHandlers.onTargetingUpdate?.(data);
+
+    // Route to specific handlers based on type
+    switch (data.type) {
+      case 'targeting_received':
+        eventHandlers.onTargetingProposalCreated?.(data);
+        break;
+      case 'targeting_accepted':
+        eventHandlers.onTargetingProposalAccepted?.(data);
+        break;
+      case 'targeting_rejected':
+        eventHandlers.onTargetingProposalRejected?.(data);
+        break;
+      case 'retargeting_occurred':
+        eventHandlers.onTargetingRetargeted?.(data);
+        break;
+      case 'targeting_cancelled':
+        eventHandlers.onTargetingCancelled?.(data);
+        break;
+      case 'auction_targeting_update':
+      case 'auction_targeting_ended':
+        eventHandlers.onAuctionCountdownUpdate?.(data);
+        break;
+    }
+  }, [
+    eventHandlers.onTargetingUpdate,
+    eventHandlers.onTargetingProposalCreated,
+    eventHandlers.onTargetingProposalAccepted,
+    eventHandlers.onTargetingProposalRejected,
+    eventHandlers.onTargetingRetargeted,
+    eventHandlers.onTargetingCancelled,
+    eventHandlers.onAuctionCountdownUpdate
+  ]);
+
+  const handleTargetingNotification = useCallback((notification: TargetingNotificationData) => {
+    console.log('Received targeting notification:', notification);
+    eventHandlers.onTargetingNotification?.(notification);
+  }, [eventHandlers.onTargetingNotification]);
+
+  const handleTargetingActivity = useCallback((data: TargetingUpdateData) => {
+    console.log('Received targeting activity:', data);
+    eventHandlers.onTargetingUpdate?.(data);
+  }, [eventHandlers.onTargetingUpdate]);
+
+  const handleTargetingStatusRead = useCallback((targetId: string) => {
+    console.log('Targeting notification marked as read:', targetId);
+  }, []);
+
+  const handleAuctionCountdownUpdate = useCallback((data: TargetingUpdateData) => {
+    console.log('Received auction countdown update:', data);
+    eventHandlers.onAuctionCountdownUpdate?.(data);
+  }, [eventHandlers.onAuctionCountdownUpdate]);
+
+  const handleAuctionProposalAdded = useCallback((data: TargetingUpdateData) => {
+    console.log('New proposal added to auction:', data);
+    eventHandlers.onTargetingUpdate?.(data);
+  }, [eventHandlers.onTargetingUpdate]);
+
+  const handleAuctionEnded = useCallback((data: TargetingUpdateData) => {
+    console.log('Auction ended:', data);
+    eventHandlers.onAuctionCountdownUpdate?.(data);
+  }, [eventHandlers.onAuctionCountdownUpdate]);
+
+  const handleTypingStart = useCallback((data: { userId: string }) => {
+    console.log('User started typing:', data.userId);
+  }, []);
+
+  const handleTypingStop = useCallback((data: { userId: string }) => {
+    console.log('User stopped typing:', data.userId);
+  }, []);
+
+  useEffect(() => {
+    const token = getAuthToken();
+
+    if (!token || !isAuthenticated) {
+      // Disconnect if no token or not authenticated
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setIsConnected(false);
+        connectionStateChecker.setConnectionState(serviceId, false);
       }
-    );
+      return;
+    }
 
-    socket.on(
-      'swap:status_change',
-      (data: {
-        swapId: string;
-        oldStatus: string;
-        newStatus: string;
-        event: SwapEvent;
-      }) => {
-        console.log('Received swap status change:', data);
-        options.onSwapStatusChange?.(data);
+    // Use throttled connection to prevent rapid successive attempts
+    const connectWithThrottling = async () => {
+      try {
+        // Check if throttling is enabled for useWebSocket specifically
+        if (isThrottlingFeatureEnabled('ENABLE_USE_WEBSOCKET_THROTTLING')) {
+          await connectionThrottlingManager.debounceConnection(
+            serviceId,
+            createThrottledConnection,
+            throttleConfig.debounceDelay
+          );
+        } else {
+          // Direct connection without throttling for useWebSocket
+          await createThrottledConnection();
+        }
+
+        if (!socketRef.current) {
+          return;
+        }
+
+        // Set up all event handlers using stable callbacks
+        socketRef.current.on('connect', handleConnect);
+        socketRef.current.on('disconnect', handleDisconnect);
+        socketRef.current.on('reconnect', handleReconnect);
+        socketRef.current.on('connect_error', handleConnectError);
+
+        // Notification handlers
+        socketRef.current.on('notification', handleNotification);
+        socketRef.current.on('notification:read', handleNotificationRead);
+
+        // Swap update handlers
+        socketRef.current.on('swap:update', handleSwapUpdate);
+        socketRef.current.on('swap:proposal', handleSwapProposal);
+        socketRef.current.on('swap:status_change', handleSwapStatusChange);
+        socketRef.current.on('swap:accepted', handleSwapUpdate);
+        socketRef.current.on('swap:rejected', handleSwapUpdate);
+        socketRef.current.on('swap:completed', handleSwapUpdate);
+        socketRef.current.on('swap:cancelled', handleSwapUpdate);
+        socketRef.current.on('swap:expired', handleSwapUpdate);
+
+        // Targeting event handlers
+        socketRef.current.on('targeting:update', handleTargetingUpdate);
+        socketRef.current.on('targeting:notification', handleTargetingNotification);
+        socketRef.current.on('targeting:activity', handleTargetingActivity);
+        socketRef.current.on('targeting:status_read', handleTargetingStatusRead);
+
+        // Auction-specific targeting events
+        socketRef.current.on('auction:countdown_update', handleAuctionCountdownUpdate);
+        socketRef.current.on('auction:proposal_added', handleAuctionProposalAdded);
+        socketRef.current.on('auction:ended', handleAuctionEnded);
+
+        // Typing indicators
+        socketRef.current.on('typing:start', handleTypingStart);
+        socketRef.current.on('typing:stop', handleTypingStop);
+
+      } catch (error) {
+        console.error('Failed to establish throttled WebSocket connection:', error);
+        setConnectionError(error instanceof Error ? error.message : 'Connection failed');
       }
-    );
+    };
 
-    socket.on('swap:accepted', (data: SwapUpdateData) => {
-      console.log('Swap accepted:', data);
-      options.onSwapUpdate?.(data);
-    });
+    // Initiate throttled connection
+    connectWithThrottling();
 
-    socket.on('swap:rejected', (data: SwapUpdateData) => {
-      console.log('Swap rejected:', data);
-      options.onSwapUpdate?.(data);
-    });
-
-    socket.on('swap:completed', (data: SwapUpdateData) => {
-      console.log('Swap completed:', data);
-      options.onSwapUpdate?.(data);
-    });
-
-    socket.on('swap:cancelled', (data: SwapUpdateData) => {
-      console.log('Swap cancelled:', data);
-      options.onSwapUpdate?.(data);
-    });
-
-    socket.on('swap:expired', (data: SwapUpdateData) => {
-      console.log('Swap expired:', data);
-      options.onSwapUpdate?.(data);
-    });
-
-    // Targeting event handlers
-    socket.on('targeting:update', (data: TargetingUpdateData) => {
-      console.log('Received targeting update:', data);
-      options.onTargetingUpdate?.(data);
-
-      // Route to specific handlers based on type
-      switch (data.type) {
-        case 'targeting_received':
-          options.onTargetingProposalCreated?.(data);
-          break;
-        case 'targeting_accepted':
-          options.onTargetingProposalAccepted?.(data);
-          break;
-        case 'targeting_rejected':
-          options.onTargetingProposalRejected?.(data);
-          break;
-        case 'retargeting_occurred':
-          options.onTargetingRetargeted?.(data);
-          break;
-        case 'targeting_cancelled':
-          options.onTargetingCancelled?.(data);
-          break;
-        case 'auction_targeting_update':
-        case 'auction_targeting_ended':
-          options.onAuctionCountdownUpdate?.(data);
-          break;
-      }
-    });
-
-    socket.on('targeting:notification', (notification: TargetingNotificationData) => {
-      console.log('Received targeting notification:', notification);
-      options.onTargetingNotification?.(notification);
-    });
-
-    socket.on('targeting:activity', (data: TargetingUpdateData) => {
-      console.log('Received targeting activity:', data);
-      options.onTargetingUpdate?.(data);
-    });
-
-    socket.on('targeting:status_read', (targetId: string) => {
-      console.log('Targeting notification marked as read:', targetId);
-      // Handle targeting notification read status update
-    });
-
-    // Auction-specific targeting events
-    socket.on('auction:countdown_update', (data: TargetingUpdateData) => {
-      console.log('Received auction countdown update:', data);
-      options.onAuctionCountdownUpdate?.(data);
-    });
-
-    socket.on('auction:proposal_added', (data: TargetingUpdateData) => {
-      console.log('New proposal added to auction:', data);
-      options.onTargetingUpdate?.(data);
-    });
-
-    socket.on('auction:ended', (data: TargetingUpdateData) => {
-      console.log('Auction ended:', data);
-      options.onAuctionCountdownUpdate?.(data);
-    });
-
-    // Typing indicators (for future chat feature)
-    socket.on('typing:start', (data: { userId: string }) => {
-      console.log('User started typing:', data.userId);
-    });
-
-    socket.on('typing:stop', (data: { userId: string }) => {
-      console.log('User stopped typing:', data.userId);
-    });
-
-    // Cleanup on unmount
+    // Cleanup function
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
       setIsConnected(false);
+      connectionStateChecker.setConnectionState(serviceId, false);
+
+      // Only clear throttling if enabled
+      if (isThrottlingFeatureEnabled('ENABLE_USE_WEBSOCKET_THROTTLING')) {
+        connectionThrottlingManager.clearDebounce(serviceId);
+      }
     };
   }, [
-    token,
-    options.onNotification,
-    options.onSwapUpdate,
-    options.onConnect,
-    options.onDisconnect,
+    isAuthenticated,
+    getAuthToken,
+    serviceId,
+    throttleConfig.debounceDelay,
+    throttleConfig.connectionTimeout,
+    createThrottledConnection,
+    handleConnect,
+    handleDisconnect,
+    handleReconnect,
+    handleConnectError,
+    handleNotification,
+    handleNotificationRead,
+    handleSwapUpdate,
+    handleSwapProposal,
+    handleSwapStatusChange,
+    handleTargetingUpdate,
+    handleTargetingNotification,
+    handleTargetingActivity,
+    handleTargetingStatusRead,
+    handleAuctionCountdownUpdate,
+    handleAuctionProposalAdded,
+    handleAuctionEnded,
+    handleTypingStart,
+    handleTypingStop,
   ]);
 
   // Helper functions
@@ -337,5 +489,9 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
     subscribeToTargeting,
     unsubscribeFromTargeting,
     markTargetingAsRead,
+    // Health monitoring
+    health,
+    manualReconnect,
+    resetReconnectAttempts,
   };
 };
