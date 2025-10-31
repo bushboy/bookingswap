@@ -29,24 +29,75 @@ This is a monorepo containing:
 
 ## Getting Started
 
-1. Install dependencies:
+### 1. Install Dependencies
 
 ```bash
 npm install
 ```
 
-2. Set up environment variables:
+### 2. Set Up Environment Variables
 
+**Linux/macOS:**
 ```bash
 cp apps/backend/.env.example apps/backend/.env
 cp apps/frontend/.env.example apps/frontend/.env
 ```
 
-3. Start development servers:
+**Windows (Command Prompt):**
+```cmd
+copy apps\backend\.env.example apps\backend\.env
+copy apps\frontend\.env.example apps\frontend\.env
+```
 
+**Windows (PowerShell):**
+```powershell
+Copy-Item apps\backend\.env.example apps\backend\.env
+Copy-Item apps\frontend\.env.example apps\frontend\.env
+```
+
+### 3. Set Up Required Services
+
+**PostgreSQL Database:**
+- **Linux:** `sudo apt-get install postgresql` or use Docker
+- **macOS:** `brew install postgresql` or use Docker
+- **Windows:** Download from [postgresql.org](https://www.postgresql.org/download/windows/) or use Docker
+
+**Redis Cache:**
+- **Linux:** `sudo apt-get install redis-server` or use Docker
+- **macOS:** `brew install redis` or use Docker  
+- **Windows:** Use Docker or [Redis for Windows](https://github.com/microsoftarchive/redis/releases)
+
+**Docker (Optional but Recommended):**
+- Download from [docker.com](https://www.docker.com/products/docker-desktop/)
+
+### 4. Start Development Servers
+
+**Option A: Using npm scripts (All Platforms):**
 ```bash
 npm run dev
 ```
+
+**Option B: Platform-specific convenience scripts:**
+
+**Windows:**
+```cmd
+# Command Prompt
+start-dev.bat
+
+# PowerShell
+.\start-dev.ps1
+```
+
+**Linux/macOS:**
+```bash
+# Manual start (if no convenience script)
+npm run dev:backend &
+npm run dev:frontend
+```
+
+The servers will be available at:
+- **Backend:** http://localhost:3001
+- **Frontend:** http://localhost:3000
 
 ## Available Scripts
 
@@ -112,6 +163,21 @@ See [Environment Variables Documentation](docs/ENVIRONMENT_VARIABLES.md) for com
 ### Architecture Highlights
 
 The My Bookings page uses a simplified status-based filtering approach optimized for personal booking management rather than browsing. This design focuses on booking lifecycle stages (active, with swaps, completed, expired) instead of complex search filters, providing a cleaner mobile experience and reduced cognitive load.
+
+## Platform-Specific Notes
+
+### Windows Users
+- Use PowerShell or Command Prompt as Administrator for best results
+- If you encounter permission issues, run: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+- Consider using Windows Subsystem for Linux (WSL2) for a Unix-like experience
+
+### macOS Users  
+- Install Xcode Command Line Tools: `xcode-select --install`
+- Use Homebrew for package management: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
+
+### Linux Users
+- Ensure you have build essentials: `sudo apt-get install build-essential`
+- For Ubuntu/Debian: `sudo apt-get update` before installing packages
 
 ## Documentation
 
