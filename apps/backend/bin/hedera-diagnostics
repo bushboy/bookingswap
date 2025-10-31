@@ -1,0 +1,19 @@
+#!/usr/bin/env node
+
+const { spawn } = require('child_process');
+const path = require('path');
+
+// Get the directory of this script
+const binDir = __dirname;
+const projectRoot = path.join(binDir, '..');
+const cliScript = path.join(projectRoot, 'src', 'cli', 'hedera-diagnostics.ts');
+
+// Run the TypeScript CLI using tsx
+const child = spawn('npx', ['tsx', cliScript, ...process.argv.slice(2)], {
+  cwd: projectRoot,
+  stdio: 'inherit'
+});
+
+child.on('exit', (code) => {
+  process.exit(code);
+});

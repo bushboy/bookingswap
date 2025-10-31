@@ -1,0 +1,61 @@
+{
+  "name": "booking-swap-platform",
+  "version": "1.0.0",
+  "description": "Decentralized booking swap platform built on Hedera blockchain",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --workspace=@booking-swap/backend",
+    "dev:frontend": "npm run dev --workspace=@booking-swap/frontend",
+    "build": "npm run build --workspaces",
+    "build:backend": "npm run build --workspace=@booking-swap/backend",
+    "build:frontend": "npm run build --workspace=@booking-swap/frontend",
+    "test": "npm run test --workspaces",
+    "test:unit": "npm run test:unit --workspaces",
+    "test:integration": "npm run test:integration --workspaces",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:load": "k6 run tests/load/load-test.js",
+    "test:security": "node scripts/run-security-tests.js",
+    "test:security:backend": "npm run test:security --workspace=@booking-swap/backend",
+    "test:security:frontend": "npm run test:security --workspace=@booking-swap/frontend",
+    "lint:security": "eslint --ext .ts,.js --config .eslintrc.security.json apps/",
+    "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e && npm run test:load",
+    "lint": "npm run lint --workspaces",
+    "lint:fix": "npm run lint:fix --workspaces",
+    "lint:css-conflicts": "node scripts/check-css-conflicts.js",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "clean": "npm run clean --workspaces && rimraf node_modules",
+    "postinstall": "husky install"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "concurrently": "^8.2.0",
+    "eslint": "^8.45.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-no-secrets": "^0.8.9",
+    "eslint-plugin-prettier": "^5.0.0",
+    "eslint-plugin-rulesdir": "^0.2.2",
+    "eslint-plugin-security": "^1.7.1",
+    "glob": "^11.0.3",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.2.3",
+    "prettier": "^3.0.0",
+    "rimraf": "^5.0.1",
+    "supertest": "^6.3.3",
+    "typescript": "^5.1.6"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

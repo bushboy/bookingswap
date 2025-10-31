@@ -1,0 +1,66 @@
+/* Interface Themes CSS */
+
+/* Default theme variables */
+:root {
+  --theme-primary: #2563eb;
+  --theme-secondary: #4b5563;
+  --theme-accent: #9333ea;
+  --theme-background: #ffffff;
+  --theme-surface: #f9fafb;
+  --theme-text: #111827;
+  --theme-text-secondary: #4b5563;
+  --theme-border: #e5e7eb;
+}
+
+/* Booking theme */
+.theme-booking {
+  --theme-primary: #16a34a;
+  --theme-accent: #22c55e;
+}
+
+/* Swap theme */
+.theme-swap {
+  --theme-primary: #2563eb;
+  --theme-accent: #3b82f6;
+}
+
+/* Theme utility classes */
+.themed-container {
+  background-color: var(--theme-background);
+  color: var(--theme-text);
+}
+
+.themed-surface {
+  background-color: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+  border-radius: 0.375rem;
+}
+
+.themed-primary {
+  background-color: var(--theme-primary);
+  color: white;
+}
+
+.themed-secondary {
+  background-color: var(--theme-secondary);
+  color: white;
+}
+
+.themed-text {
+  color: var(--theme-text);
+}
+
+.themed-text-secondary {
+  color: var(--theme-text-secondary);
+}
+
+/* Responsive theme adjustments */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --theme-background: #111827;
+    --theme-surface: #1f2937;
+    --theme-text: #f9fafb;
+    --theme-text-secondary: #9ca3af;
+    --theme-border: #374151;
+  }
+}

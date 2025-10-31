@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shield background -->
+  <path d="M8 1.5L3 4V7C3 10 5.5 13 8 14.5C10.5 13 13 10 13 7V4L8 1.5Z" fill="#1E3A5F"/>
+  
+  <!-- Swap arrows background -->
+  <path d="M6 4.5L8 3L10 4.5L9 4.5L9 6L11 6L11 7L9 7L9 8.5L10 8.5L8 10L6 8.5L7 8.5L7 7L5 7L5 6L7 6L7 4.5L6 4.5Z" fill="#F4C430"/>
+  
+  <!-- Clock circle -->
+  <circle cx="8" cy="7" r="2" fill="#F4C430" stroke="#1E3A5F" stroke-width="0.25"/>
+  
+  <!-- Checkmark -->
+  <path d="M7 7L7.5 7.5L9 6" stroke="#1E3A5F" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,422 @@
+/* Screen reader only content */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Focus visible styles for better keyboard navigation */
+.focus-visible {
+  outline: 2px solid #0ea5e9 !important;
+  outline-offset: 2px !important;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .booking-card,
+  .swap-card,
+  .modal {
+    border: 2px solid !important;
+  }
+  
+  .button {
+    border: 2px solid !important;
+  }
+  
+  /* Swap-specific high contrast styles */
+  .swap-status-badge {
+    border: 2px solid currentColor !important;
+    background: transparent !important;
+    font-weight: bold !important;
+  }
+  
+  .swap-preferences-section {
+    border: 2px solid currentColor !important;
+  }
+  
+  .inline-proposal-form {
+    border: 3px solid currentColor !important;
+    background: Canvas !important;
+    color: CanvasText !important;
+  }
+  
+  .swap-filter-toggle {
+    border: 2px solid currentColor !important;
+    background: transparent !important;
+  }
+  
+  .swap-filter-toggle:checked,
+  .swap-filter-toggle[aria-pressed="true"] {
+    background: Highlight !important;
+    color: HighlightText !important;
+  }
+  
+  /* Enhanced focus indicators for swap components */
+  .swap-toggle:focus,
+  .proposal-type-option:focus,
+  .swap-filter:focus {
+    outline: 3px solid Highlight !important;
+    outline-offset: 2px !important;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Focus management for modals */
+.modal-open {
+  overflow: hidden;
+}
+
+/* Skip links */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  text-decoration: none;
+  z-index: 9999;
+  border-radius: 4px;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Touch target sizing */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Loading states */
+.loading {
+  position: relative;
+}
+
+.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Error states */
+.error {
+  border-color: #dc2626 !important;
+}
+
+.error-message {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Success states */
+.success {
+  border-color: #16a34a !important;
+}
+
+.success-message {
+  color: #16a34a;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Focus trap */
+.focus-trap {
+  position: relative;
+}
+
+/* Keyboard navigation indicators */
+.keyboard-navigation .focusable:focus {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+/* ARIA live regions */
+.live-region {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Color contrast helpers */
+.high-contrast {
+  background: #000 !important;
+  color: #fff !important;
+  border: 2px solid #fff !important;
+}
+
+.high-contrast .text-muted {
+  color: #ccc !important;
+}
+
+/* Mobile accessibility improvements */
+@media (max-width: 768px) {
+  .touch-target {
+    min-width: 48px;
+    min-height: 48px;
+  }
+  
+  /* Larger text for better readability */
+  .mobile-text {
+    font-size: 16px !important;
+  }
+  
+  /* Prevent zoom on input focus */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Print styles for accessibility */
+@media print {
+  .sr-only {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    clip: auto !important;
+    white-space: normal !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Swap-specific accessibility enhancements */
+
+/* Focus management for inline forms */
+.inline-proposal-form {
+  position: relative;
+}
+
+.inline-proposal-form:focus-within {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+/* Keyboard navigation indicators */
+.proposal-type-selector [role="radio"]:focus {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.swap-filter-group [role="button"]:focus,
+.swap-filter-group input:focus {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+
+/* Screen reader announcements for swap status */
+.swap-status-live-region {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Enhanced touch targets for mobile */
+@media (max-width: 768px) {
+  .swap-toggle,
+  .proposal-type-option,
+  .swap-filter-toggle {
+    min-width: 48px !important;
+    min-height: 48px !important;
+    padding: 12px !important;
+  }
+  
+  .inline-proposal-form {
+    padding: 20px !important;
+  }
+  
+  .swap-status-badge {
+    font-size: 14px !important;
+    padding: 8px 12px !important;
+  }
+}
+
+/* Animation preferences */
+@media (prefers-reduced-motion: reduce) {
+  .swap-preferences-section,
+  .inline-proposal-form,
+  .swap-filter-toggle {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Color contrast enhancements for swap indicators */
+.swap-status-urgent {
+  background: #dc2626 !important;
+  color: white !important;
+  border: 2px solid #dc2626 !important;
+}
+
+.swap-status-ending-soon {
+  background: #f59e0b !important;
+  color: white !important;
+  border: 2px solid #f59e0b !important;
+}
+
+.swap-status-auction {
+  background: #0ea5e9 !important;
+  color: white !important;
+  border: 2px solid #0ea5e9 !important;
+}
+
+.swap-status-available {
+  background: #16a34a !important;
+  color: white !important;
+  border: 2px solid #16a34a !important;
+}
+
+/* Error states for swap forms */
+.swap-form-error {
+  border-color: #dc2626 !important;
+  background-color: #fef2f2 !important;
+}
+
+.swap-form-error:focus {
+  outline-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2) !important;
+}
+
+/* Success states for swap forms */
+.swap-form-success {
+  border-color: #16a34a !important;
+  background-color: #f0fdf4 !important;
+}
+
+/* Loading states for swap components */
+.swap-component-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.swap-component-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #0ea5e9;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Skip links for swap functionality */
+.skip-to-swap-filters {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #0ea5e9;
+  color: white;
+  padding: 8px 12px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 9999;
+  font-size: 14px;
+}
+
+.skip-to-swap-filters:focus {
+  top: 6px;
+}
+
+/* Improved contrast for disabled states */
+.swap-option-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #f3f4f6 !important;
+  color: #6b7280 !important;
+}
+
+.swap-option-disabled:hover {
+  background-color: #f3f4f6 !important;
+}
+
+/* Tooltip accessibility */
+.swap-tooltip {
+  position: relative;
+}
+
+.swap-tooltip[aria-describedby]:hover::after,
+.swap-tooltip[aria-describedby]:focus::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  margin-bottom: 4px;
+}
+
+/* Print styles for swap information */
+@media print {
+  .swap-status-badge::after {
+    content: " (" attr(title) ")";
+    font-size: 10px;
+    color: #000;
+  }
+  
+  .inline-proposal-form {
+    border: 1px solid #000 !important;
+    page-break-inside: avoid;
+  }
+  
+  .swap-preferences-section {
+    border: 1px solid #000 !important;
+    page-break-inside: avoid;
+  }
+}

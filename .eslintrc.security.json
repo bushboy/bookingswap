@@ -1,0 +1,73 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "plugins": [
+    "@typescript-eslint",
+    "security",
+    "no-secrets"
+  ],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:security/recommended"
+  ],
+  "rules": {
+    "security/detect-object-injection": "error",
+    "security/detect-non-literal-regexp": "error",
+    "security/detect-non-literal-fs-filename": "error",
+    "security/detect-eval-with-expression": "error",
+    "security/detect-pseudoRandomBytes": "error",
+    "security/detect-possible-timing-attacks": "error",
+    "security/detect-unsafe-regex": "error",
+    "security/detect-buffer-noassert": "error",
+    "security/detect-child-process": "error",
+    "security/detect-disable-mustache-escape": "error",
+    "security/detect-no-csrf-before-method-override": "error",
+    "security/detect-non-literal-require": "error",
+    "security/detect-bidi-characters": "error",
+    "no-secrets/no-secrets": ["error", {
+      "tolerance": 4.2,
+      "additionalRegexes": {
+        "Hedera Private Key": "302e020100300506032b657004220420[a-fA-F0-9]{64}",
+        "Hedera Account ID": "0\\.0\\.[0-9]+",
+        "JWT Secret": "[a-zA-Z0-9_-]{32,}",
+        "Database URL": "(postgres|mysql|mongodb)://[^\\s]+",
+        "API Key": "(api[_-]?key|apikey)[\\s]*[:=][\\s]*['\"][a-zA-Z0-9_-]{20,}['\"]"
+      }
+    }],
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error",
+    "no-alert": "error",
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-unused-vars": "error",
+    "prefer-const": "error",
+    "no-var": "error"
+  },
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "overrides": [
+    {
+      "files": ["*.ts"],
+      "parser": "@typescript-eslint/parser",
+      "parserOptions": {
+        "project": "./tsconfig.json"
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.spec.ts"],
+      "rules": {
+        "security/detect-non-literal-fs-filename": "off",
+        "security/detect-child-process": "off",
+        "no-console": "off"
+      }
+    }
+  ]
+}

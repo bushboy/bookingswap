@@ -1,0 +1,437 @@
+/* Error Recovery Panel Styles */
+.error-recovery-panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 16px 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.recovery-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.recovery-header h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.recovery-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 14px;
+}
+
+.success-rate {
+    background: #f0f9ff;
+    color: #0369a1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.recovery-message {
+    margin-bottom: 20px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 6px;
+    border-left: 4px solid #3b82f6;
+}
+
+.recovery-message p {
+    margin: 0;
+    color: #475569;
+    line-height: 1.5;
+}
+
+/* Recovery Strategies */
+.recovery-strategies {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.recovery-strategy {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+    transition: all 0.2s ease;
+}
+
+.recovery-strategy:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.recovery-strategy.low-risk {
+    border-left: 4px solid #10b981;
+    background: linear-gradient(90deg, #f0fdf4, #ffffff);
+}
+
+.recovery-strategy.medium-risk {
+    border-left: 4px solid #f59e0b;
+    background: linear-gradient(90deg, #fffbeb, #ffffff);
+}
+
+.recovery-strategy.high-risk {
+    border-left: 4px solid #ef4444;
+    background: linear-gradient(90deg, #fef2f2, #ffffff);
+}
+
+.strategy-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.strategy-icon {
+    font-size: 16px;
+}
+
+.strategy-name {
+    font-weight: 600;
+    color: #1e293b;
+    flex: 1;
+}
+
+.strategy-risk {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+}
+
+.low-risk .strategy-risk {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.medium-risk .strategy-risk {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.high-risk .strategy-risk {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.strategy-description {
+    margin: 8px 0 12px 0;
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.recovery-button {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 120px;
+    justify-content: center;
+}
+
+.recovery-button:hover:not(:disabled) {
+    background: #2563eb;
+    transform: translateY(-1px);
+}
+
+.recovery-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.recovery-button.active {
+    background: #1d4ed8;
+}
+
+.recovery-button.low-risk {
+    background: #10b981;
+}
+
+.recovery-button.low-risk:hover:not(:disabled) {
+    background: #059669;
+}
+
+.recovery-button.medium-risk {
+    background: #f59e0b;
+}
+
+.recovery-button.medium-risk:hover:not(:disabled) {
+    background: #d97706;
+}
+
+.recovery-button.high-risk {
+    background: #ef4444;
+}
+
+.recovery-button.high-risk:hover:not(:disabled) {
+    background: #dc2626;
+}
+
+.spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Recovery History */
+.recovery-history-section {
+    margin-bottom: 20px;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 16px;
+}
+
+.history-toggle {
+    background: none;
+    border: none;
+    color: #3b82f6;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.history-toggle:hover {
+    color: #2563eb;
+}
+
+.recovery-history {
+    margin-top: 12px;
+    space-y: 8px;
+}
+
+.recovery-result {
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 8px;
+}
+
+.recovery-result.success {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.recovery-result.failure {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
+.result-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.result-icon {
+    font-size: 14px;
+}
+
+.result-strategy {
+    font-weight: 500;
+    color: #1e293b;
+    flex: 1;
+}
+
+.result-time {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.result-message {
+    font-size: 13px;
+    color: #475569;
+    margin-bottom: 4px;
+}
+
+.result-timing {
+    font-size: 11px;
+    color: #64748b;
+    font-style: italic;
+}
+
+/* Advanced Options */
+.recovery-advanced {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 16px;
+}
+
+.advanced-options summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: #3b82f6;
+    padding: 4px 0;
+}
+
+.advanced-options summary:hover {
+    color: #2563eb;
+}
+
+.advanced-content {
+    margin-top: 16px;
+    space-y: 16px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #374151;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin: 0;
+}
+
+.error-details {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 16px;
+}
+
+.error-details h4 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.error-info-grid {
+    display: grid;
+    gap: 8px;
+}
+
+.info-item {
+    font-size: 13px;
+    color: #475569;
+}
+
+.info-item strong {
+    color: #1e293b;
+    margin-right: 8px;
+}
+
+.recovery-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.clear-history-button,
+.export-report-button {
+    background: #6b7280;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.clear-history-button:hover {
+    background: #4b5563;
+}
+
+.export-report-button:hover {
+    background: #4b5563;
+}
+
+/* Recovery Footer */
+.recovery-footer {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+    text-align: center;
+}
+
+.recovery-footer small {
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .error-recovery-panel {
+        padding: 16px;
+        margin: 12px 0;
+    }
+    
+    .recovery-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .recovery-strategies {
+        gap: 12px;
+    }
+    
+    .recovery-strategy {
+        padding: 12px;
+    }
+    
+    .strategy-header {
+        flex-wrap: wrap;
+    }
+    
+    .recovery-actions {
+        flex-direction: column;
+    }
+    
+    .clear-history-button,
+    .export-report-button {
+        width: 100%;
+    }
+}
+
+/* Animation for strategy selection */
+.recovery-strategy.selected {
+    transform: scale(1.02);
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Loading state */
+.recovery-panel-loading {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.recovery-panel-loading .recovery-button {
+    opacity: 0.5;
+}

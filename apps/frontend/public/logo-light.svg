@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shield background -->
+  <path d="M512 100L200 250V450C200 650 350 850 512 924C674 850 824 650 824 450V250L512 100Z" fill="#1E3A5F"/>
+  
+  <!-- Swap arrows background -->
+  <path d="M400 300L500 200L600 300L550 300L550 400L650 400L650 450L550 450L550 550L600 550L500 650L400 550L450 550L450 450L350 450L350 400L450 400L450 300L400 300Z" fill="#F4C430"/>
+  
+  <!-- Clock circle -->
+  <circle cx="512" cy="450" r="120" fill="#F4C430" stroke="#1E3A5F" stroke-width="8"/>
+  
+  <!-- Clock hands -->
+  <path d="M512 380L512 450L560 450" stroke="#1E3A5F" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Checkmark -->
+  <path d="M480 450L500 470L540 430" stroke="#1E3A5F" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

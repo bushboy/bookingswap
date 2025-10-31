@@ -1,0 +1,163 @@
+/* Feature Flag Error Boundary Styles */
+
+.feature-flag-error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 1rem;
+  background-color: #fef7f0;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  margin: 1rem 0;
+}
+
+.feature-flag-error-content {
+  text-align: center;
+  max-width: 500px;
+  color: #9a3412;
+}
+
+.feature-flag-error-content h3 {
+  margin: 0 0 1rem 0;
+  color: #ea580c;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.feature-flag-error-content p {
+  margin: 0.5rem 0;
+  line-height: 1.5;
+  color: #9a3412;
+}
+
+.feature-flag-error-details {
+  margin: 1rem 0;
+  text-align: left;
+  background-color: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+.feature-flag-error-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #ea580c;
+  margin-bottom: 0.5rem;
+}
+
+.feature-flag-error-details .error-info {
+  margin-top: 0.5rem;
+}
+
+.feature-flag-error-details .error-info h4 {
+  margin: 1rem 0 0.5rem 0;
+  color: #9a3412;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.feature-flag-error-details pre {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #7f1d1d;
+}
+
+.feature-flag-retry-button {
+  background-color: #ea580c;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-top: 1rem;
+}
+
+.feature-flag-retry-button:hover {
+  background-color: #dc2626;
+}
+
+.feature-flag-retry-button:focus {
+  outline: 2px solid #ea580c;
+  outline-offset: 2px;
+}
+
+.feature-flag-retry-button:active {
+  background-color: #b91c1c;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .feature-flag-error-boundary {
+    background-color: #451a03;
+    border-color: #9a3412;
+  }
+
+  .feature-flag-error-content {
+    color: #fed7aa;
+  }
+
+  .feature-flag-error-content h3 {
+    color: #fb923c;
+  }
+
+  .feature-flag-error-content p {
+    color: #fed7aa;
+  }
+
+  .feature-flag-error-details {
+    background-color: #292524;
+    border-color: #78716c;
+  }
+
+  .feature-flag-error-details summary {
+    color: #fb923c;
+  }
+
+  .feature-flag-error-details .error-info h4 {
+    color: #fed7aa;
+  }
+
+  .feature-flag-error-details pre {
+    background-color: #1c1917;
+    border-color: #44403c;
+    color: #fecaca;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+  .feature-flag-error-boundary {
+    min-height: 150px;
+    padding: 0.75rem;
+    margin: 0.5rem 0;
+  }
+
+  .feature-flag-error-content {
+    max-width: 100%;
+  }
+
+  .feature-flag-error-content h3 {
+    font-size: 1.125rem;
+  }
+
+  .feature-flag-error-details {
+    padding: 0.75rem;
+  }
+
+  .feature-flag-retry-button {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.8125rem;
+  }
+}

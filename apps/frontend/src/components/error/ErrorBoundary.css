@@ -1,0 +1,543 @@
+/* Error Boundary Styles */
+.error-boundary-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 2rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+.error-boundary-content {
+  text-align: center;
+  max-width: 500px;
+}
+
+.error-boundary-content h2 {
+  color: #dc2626;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.error-boundary-content p {
+  color: #7f1d1d;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.error-details {
+  text-align: left;
+  margin: 1rem 0;
+  padding: 1rem;
+  background-color: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+}
+
+.error-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.error-details pre {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  color: #1f2937;
+  background-color: #f9fafb;
+  padding: 0.75rem;
+  border-radius: 0.25rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-boundary-retry-button {
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.error-boundary-retry-button:hover {
+  background-color: #b91c1c;
+}
+
+.error-boundary-retry-button:focus {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
+
+.error-boundary-max-attempts {
+  color: #7f1d1d;
+  font-weight: 500;
+  font-style: italic;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .error-boundary-fallback {
+    background-color: #450a0a;
+    border-color: #7f1d1d;
+  }
+
+  .error-boundary-content h2 {
+    color: #fca5a5;
+  }
+
+  .error-boundary-content p {
+    color: #fca5a5;
+  }
+
+  .error-details {
+    background-color: #1f2937;
+    border-color: #374151;
+  }
+
+  .error-details summary {
+    color: #f3f4f6;
+  }
+
+  .error-details pre {
+    color: #e5e7eb;
+    background-color: #111827;
+  }
+
+  .error-boundary-max-attempts {
+    color: #fca5a5;
+  }
+}
+
+/* Additional fallback component styles */
+.error-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.error-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.error-boundary-report-button,
+.error-boundary-refresh-button {
+  background-color: #6b7280;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.error-boundary-report-button:hover,
+.error-boundary-refresh-button:hover {
+  background-color: #4b5563;
+}
+
+.error-boundary-report-button:focus,
+.error-boundary-refresh-button:focus {
+  outline: 2px solid #6b7280;
+  outline-offset: 2px;
+}
+
+/* Badge-specific fallback styles */
+.badge-error-fallback {
+  min-height: 120px;
+}
+
+.badge-text-fallback {
+  padding: 0.5rem;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.25rem;
+  margin: 0.75rem 0;
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+
+.badge-fallback {
+  border: 1px dashed #d1d5db !important;
+}
+
+/* Connection status fallback styles */
+.connection-status-error-fallback {
+  min-height: 140px;
+}
+
+.connection-status-fallback {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.25rem;
+  margin: 0.75rem 0;
+}
+
+.error-info h4 {
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.25rem 0;
+}
+
+.error-info p {
+  margin: 0.25rem 0;
+  font-size: 0.875rem;
+}
+
+/* Dark mode support for new elements */
+@media (prefers-color-scheme: dark) {
+  .error-boundary-report-button,
+  .error-boundary-refresh-button {
+    background-color: #4b5563;
+  }
+
+  .error-boundary-report-button:hover,
+  .error-boundary-refresh-button:hover {
+    background-color: #374151;
+  }
+
+  .badge-text-fallback,
+  .connection-status-fallback {
+    background-color: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
+  }
+
+  .error-info h4 {
+    color: #f3f4f6;
+  }
+
+  .error-info p {
+    color: #d1d5db;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 640px) {
+  .error-boundary-fallback {
+    padding: 1rem;
+    margin: 0.5rem 0;
+  }
+
+  .error-boundary-content h2 {
+    font-size: 1.25rem;
+  }
+
+  .error-details pre {
+    font-size: 0.75rem;
+    padding: 0.5rem;
+  }
+
+  .error-boundary-retry-button,
+  .error-boundary-report-button,
+  .error-boundary-refresh-button {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .error-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .error-icon {
+    font-size: 1.5rem;
+  }
+}/* Enhanc
+ed Error Fallback Styles */
+.error-boundary-fallback {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.error-boundary-content {
+    text-align: center;
+}
+
+.error-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+}
+
+.error-boundary-fallback h2 {
+    color: #1e293b;
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+}
+
+.error-boundary-fallback p {
+    color: #64748b;
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0 0 24px 0;
+}
+
+.error-success-message {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 16px 0;
+    font-weight: 500;
+}
+
+.error-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+}
+
+.error-boundary-retry-button,
+.error-boundary-reset-button,
+.error-boundary-report-button {
+    border: none;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 140px;
+    justify-content: center;
+}
+
+.error-boundary-retry-button.primary {
+    background: #3b82f6;
+    color: white;
+}
+
+.error-boundary-retry-button.primary:hover:not(:disabled) {
+    background: #2563eb;
+    transform: translateY(-1px);
+}
+
+.error-boundary-reset-button.secondary {
+    background: #f59e0b;
+    color: white;
+}
+
+.error-boundary-reset-button.secondary:hover:not(:disabled) {
+    background: #d97706;
+    transform: translateY(-1px);
+}
+
+.error-boundary-report-button.tertiary {
+    background: #6b7280;
+    color: white;
+}
+
+.error-boundary-report-button.tertiary:hover:not(:disabled) {
+    background: #4b5563;
+    transform: translateY(-1px);
+}
+
+.error-boundary-retry-button:disabled,
+.error-boundary-reset-button:disabled,
+.error-boundary-report-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.error-help-section {
+    margin: 24px 0;
+}
+
+.error-details-toggle {
+    background: none;
+    border: 1px solid #e2e8f0;
+    color: #3b82f6;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.error-details-toggle:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.error-details-expanded {
+    margin-top: 20px;
+    text-align: left;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.error-info h4 {
+    color: #1e293b;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+}
+
+.error-info p {
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 16px 0;
+}
+
+.error-info ul {
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 16px 0;
+    padding-left: 20px;
+}
+
+.error-info li {
+    margin-bottom: 8px;
+}
+
+.error-info li strong {
+    color: #1e293b;
+}
+
+.error-technical-details {
+    margin-top: 20px;
+}
+
+.error-technical-details summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: #3b82f6;
+    padding: 8px 0;
+}
+
+.technical-info {
+    margin-top: 16px;
+}
+
+.technical-info h5 {
+    color: #1e293b;
+    font-size: 14px;
+    font-weight: 600;
+    margin: 16px 0 8px 0;
+}
+
+.technical-info pre {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 12px;
+    border-radius: 6px;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.error-footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+    text-align: center;
+}
+
+.error-footer small {
+    color: #64748b;
+    font-size: 12px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .error-boundary-fallback {
+        margin: 12px;
+        padding: 20px;
+    }
+    
+    .error-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .error-boundary-retry-button,
+    .error-boundary-reset-button,
+    .error-boundary-report-button {
+        width: 100%;
+        max-width: 280px;
+    }
+    
+    .error-details-expanded {
+        padding: 16px;
+    }
+}
+
+/* Animation for error appearance */
+.error-boundary-fallback {
+    animation: errorFadeIn 0.3s ease-out;
+}
+
+@keyframes errorFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Loading states */
+.error-boundary-retry-button:disabled,
+.error-boundary-reset-button:disabled,
+.error-boundary-report-button:disabled {
+    position: relative;
+}
+
+.error-boundary-retry-button:disabled::after,
+.error-boundary-reset-button:disabled::after,
+.error-boundary-report-button:disabled::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    margin: -8px 0 0 -8px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
